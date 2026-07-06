@@ -54,26 +54,38 @@ Use a mobile viewport (390×844, `isMobile: true`) — the UI is phone-first.
 
 ## Etesync sync verification
 
-A local Etebase server can be run from nixpkgs (`etebase-server` 0.14.x):
+**Preferred: docker.** The `victorrds/etesync:alpine` image is already pulled
+on this machine (verified working):
 
-1. Config ini (env `ETEBASE_EASY_CONFIG_PATH`): `[global] secret_file/media_root/static_root`
-   (static_root dir must exist), `[allowed_hosts] allowed_host1 = *`,
-   `[database] engine = django.db.backends.sqlite3, name = <path>`.
-2. `nix shell nixpkgs#etebase-server -c etebase-server migrate`
-3. Django `runserver` is broken (no wsgi module; the reloader also chokes on the
-   nix wrapper). Run the ASGI app instead: extract PYTHONPATH + python via
-   `etebase-server shell --command "import os,sys; print(sys.executable); print(os.environ['PYTHONPATH'])"`,
-   then `python -m uvicorn etebase_server.asgi:application --port 8033`.
-   CORS is allow-all out of the box.
-4. Signup is disabled by default: create the user first with
-   `etebase-server shell --command "from etebase_server.myauth.models import User; User.objects.create_user('u','u@example.com')"`,
-   then `Etebase.Account.signup({username,email}, password, url)` initializes it.
-5. A node script using the repo's `etebase` package (CJS `require('etebase')`)
-   works for signup and for asserting server-side items; content is E2E
-   encrypted so reading items requires logging in.
-6. Drive two browser contexts as two devices: login via Settings, "Sync now"
-   button, assert cross-device pull/merge/tombstone. `context.setOffline(true/false)`
-   exercises the reconnect auto-sync ('online' event).
+```bash
+docker run --rm -d --name etesync-test -p 8033:3735 \
+  -e SUPER_USER=gymrat -e SUPER_PASS=correct-horse-battery \
+  -e ALLOWED_HOSTS=127.0.0.1,localhost \
+  victorrds/etesync:alpine
+# ~10 s startup; probe: curl http://127.0.0.1:8033/api/v1/authentication/is_etebase/
+```
+
+`ALLOWED_HOSTS` is required — the image's default wildcard crashes starlette's
+TrustedHostMiddleware (HTTP 500 on every request). `SUPER_USER`/`SUPER_PASS`
+creates the Django user; the etebase account still needs one-time client-side
+init via `Etebase.Account.signup({ username, email }, password, url)` (same
+username), after which `Account.login` works. CORS is allow-all.
+
+Fallback without docker: nixpkgs `etebase-server` works but is fiddly — needs a
+config ini (`ETEBASE_EASY_CONFIG_PATH`) with secret_file/media_root/static_root
+(dir must exist) + sqlite database, `etebase-server migrate`, and must be run as
+`python -m uvicorn etebase_server.asgi:application` with PYTHONPATH extracted
+from the wrapper (Django `runserver` is broken in the package: no wsgi module,
+and the autoreloader chokes on the nix wrapper). Create the user via
+`etebase-server shell --command "from etebase_server.myauth.models import User; User.objects.create_user('u','u@example.com')"`.
+
+Testing approach:
+- A node script using the repo's `etebase` package (CJS `require('etebase')`)
+  works for signup and for asserting server-side items; content is E2E
+  encrypted so reading items requires logging in.
+- Drive two browser contexts as two devices: login via Settings, "Sync now"
+  button, assert cross-device pull/merge/tombstone. `context.setOffline(true/false)`
+  exercises the reconnect auto-sync ('online' event).
 
 ## Selector gotchas
 
