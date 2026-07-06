@@ -8,6 +8,10 @@ const router = createRouter({
       component: () => import('@/pages/HomePage.vue'),
     },
     {
+      path: '/session/:id',
+      component: () => import('@/pages/SessionPage.vue'),
+    },
+    {
       path: '/settings',
       component: () => import('@/pages/SettingsPage.vue'),
     },

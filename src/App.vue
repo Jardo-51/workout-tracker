@@ -21,9 +21,12 @@
   import { useTheme } from 'vuetify'
   import AppBottomNav from '@/components/layout/AppBottomNav.vue'
   import { useAppStore } from '@/stores/app'
+  import { useSessionsStore } from '@/stores/sessions'
 
   const app = useAppStore()
   const theme = useTheme()
+
+  useSessionsStore().load()
 
   watch(() => app.darkMode, dark => {
     theme.change(dark ? 'dark' : 'light')
