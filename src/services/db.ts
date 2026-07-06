@@ -2,21 +2,45 @@ import type { Session } from '@/types/workout'
 import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB } from 'idb'
 
+/** Etebase sync bookkeeping for one session. */
+export interface SessionSyncMeta {
+  sessionId: string
+  itemUid: string
+  /** Serialized etebase item (itemManager.cacheSave). */
+  cache: Uint8Array
+  /** The session.updatedAt value that was last pushed to / pulled from the server. */
+  syncedUpdatedAt: number
+}
+
 interface WorkoutDB extends DBSchema {
   sessions: {
     key: string
     value: Session
     indexes: { 'by-dateKey': string }
   }
+  syncMeta: {
+    key: string
+    value: SessionSyncMeta
+  }
+  meta: {
+    key: string
+    value: unknown
+  }
 }
 
 let dbPromise: Promise<IDBPDatabase<WorkoutDB>> | undefined
 
 function getDB (): Promise<IDBPDatabase<WorkoutDB>> {
-  dbPromise ??= openDB<WorkoutDB>('workout-tracker', 1, {
-    upgrade (db) {
-      const store = db.createObjectStore('sessions', { keyPath: 'id' })
-      store.createIndex('by-dateKey', 'dateKey')
+  dbPromise ??= openDB<WorkoutDB>('workout-tracker', 2, {
+    upgrade (db, oldVersion) {
+      if (oldVersion < 1) {
+        const store = db.createObjectStore('sessions', { keyPath: 'id' })
+        store.createIndex('by-dateKey', 'dateKey')
+      }
+      if (oldVersion < 2) {
+        db.createObjectStore('syncMeta', { keyPath: 'sessionId' })
+        db.createObjectStore('meta')
+      }
     },
   })
   return dbPromise
@@ -31,6 +55,33 @@ export async function getAllSessions (): Promise<Session[]> {
 export async function putSession (session: Session): Promise<void> {
   const db = await getDB()
   await db.put('sessions', toPlain(session))
+}
+
+export async function getSyncMeta (sessionId: string): Promise<SessionSyncMeta | undefined> {
+  const db = await getDB()
+  return db.get('syncMeta', sessionId)
+}
+
+export async function putSyncMeta (meta: SessionSyncMeta): Promise<void> {
+  const db = await getDB()
+  await db.put('syncMeta', meta)
+}
+
+export async function getMeta<T> (key: string): Promise<T | undefined> {
+  const db = await getDB()
+  return await db.get('meta', key) as T | undefined
+}
+
+export async function setMeta (key: string, value: unknown): Promise<void> {
+  const db = await getDB()
+  await db.put('meta', value, key)
+}
+
+/** Drops all sync bookkeeping (on logout). Sessions themselves are kept. */
+export async function clearSyncState (): Promise<void> {
+  const db = await getDB()
+  await db.clear('syncMeta')
+  await db.clear('meta')
 }
 
 /**

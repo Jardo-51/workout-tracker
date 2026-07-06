@@ -11,6 +11,8 @@ function normalizeName (name: string): string {
 export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref<Session[]>([])
   const loaded = ref(false)
+  /** Bumped on every user-driven mutation; the sync store watches it. */
+  const mutationCount = ref(0)
 
   async function load () {
     if (loaded.value) {
@@ -82,6 +84,21 @@ export const useSessionsStore = defineStore('sessions', () => {
   async function persist (session: Session) {
     session.updatedAt = Date.now()
     await putSession(session)
+    mutationCount.value++
+  }
+
+  /**
+   * Applies a session pulled from the sync server: stored verbatim (no
+   * updatedAt bump) and does not count as a user mutation.
+   */
+  async function upsertFromRemote (session: Session) {
+    const index = sessions.value.findIndex(s => s.id === session.id)
+    if (index === -1) {
+      sessions.value.push(session)
+    } else {
+      sessions.value[index] = session
+    }
+    await putSession(session)
   }
 
   async function startSession (): Promise<Session> {
@@ -95,6 +112,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
     sessions.value.push(session)
     await putSession(session)
+    mutationCount.value++
     return session
   }
 
@@ -169,7 +187,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   return {
     sessions,
     loaded,
+    mutationCount,
     load,
+    upsertFromRemote,
     visibleSessions,
     activeSession,
     exerciseNames,

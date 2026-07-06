@@ -22,11 +22,14 @@
   import AppBottomNav from '@/components/layout/AppBottomNav.vue'
   import { useAppStore } from '@/stores/app'
   import { useSessionsStore } from '@/stores/sessions'
+  import { useSyncStore } from '@/stores/sync'
 
   const app = useAppStore()
   const theme = useTheme()
 
-  useSessionsStore().load()
+  const sessions = useSessionsStore()
+  const sync = useSyncStore()
+  sessions.load().then(() => sync.init())
 
   watch(() => app.darkMode, dark => {
     theme.change(dark ? 'dark' : 'light')

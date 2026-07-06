@@ -52,7 +52,16 @@ src/
 - Installable on mobile and desktop — runs as a standalone app
 - Full offline functionality via service worker caching
 - Auto-updates when a new version is deployed
-- No account required — your data stays on your device
+- No account required — your data stays on your device (IndexedDB)
+
+## Etesync Sync (optional)
+
+Workout data can be synced across devices through an [Etesync](https://www.etesync.com/)
+(Etebase) server — end-to-end encrypted. Enter your server URL, username, and
+password under Settings → Etesync sync. Sync runs automatically a few seconds
+after each change and whenever the app comes back online; changes made offline
+are pushed on reconnect. Conflicts resolve last-write-wins per session, and
+deletions propagate. Logging out keeps all local data.
 
 ## Dark Mode
 

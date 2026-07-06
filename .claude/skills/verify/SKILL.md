@@ -52,6 +52,29 @@ Use a mobile viewport (390×844, `isMobile: true`) — the UI is phone-first.
   (tap card), deletes (entry via dialog, session via home list, tombstoned in DB).
 - Settings: kg/lbs toggle changes default unit for new entries only.
 
+## Etesync sync verification
+
+A local Etebase server can be run from nixpkgs (`etebase-server` 0.14.x):
+
+1. Config ini (env `ETEBASE_EASY_CONFIG_PATH`): `[global] secret_file/media_root/static_root`
+   (static_root dir must exist), `[allowed_hosts] allowed_host1 = *`,
+   `[database] engine = django.db.backends.sqlite3, name = <path>`.
+2. `nix shell nixpkgs#etebase-server -c etebase-server migrate`
+3. Django `runserver` is broken (no wsgi module; the reloader also chokes on the
+   nix wrapper). Run the ASGI app instead: extract PYTHONPATH + python via
+   `etebase-server shell --command "import os,sys; print(sys.executable); print(os.environ['PYTHONPATH'])"`,
+   then `python -m uvicorn etebase_server.asgi:application --port 8033`.
+   CORS is allow-all out of the box.
+4. Signup is disabled by default: create the user first with
+   `etebase-server shell --command "from etebase_server.myauth.models import User; User.objects.create_user('u','u@example.com')"`,
+   then `Etebase.Account.signup({username,email}, password, url)` initializes it.
+5. A node script using the repo's `etebase` package (CJS `require('etebase')`)
+   works for signup and for asserting server-side items; content is E2E
+   encrypted so reading items requires logging in.
+6. Drive two browser contexts as two devices: login via Settings, "Sync now"
+   button, assert cross-device pull/merge/tombstone. `context.setOffline(true/false)`
+   exercises the reconnect auto-sync ('online' event).
+
 ## Selector gotchas
 
 - Closed Vuetify dialogs stay mounted: scope entry cards with `.v-card.mb-2`,
