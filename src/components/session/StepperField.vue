@@ -1,19 +1,21 @@
 <template>
   <div class="d-flex align-center ga-2 mb-3">
     <v-btn
-      :disabled="model - step < min"
+      :disabled="model <= min"
       icon="mdi-minus"
       variant="tonal"
-      @click="model = round(model - step)"
+      @click="commit(round(model - step))"
     />
 
     <v-text-field
       density="comfortable"
+      :error="invalid"
       hide-details
       :inputmode="decimal ? 'decimal' : 'numeric'"
       :label="label"
       :model-value="text"
       :suffix="suffix"
+      @blur="onBlur"
       @update:model-value="onInput"
     >
       <template v-if="$slots['append-inner']" #append-inner>
@@ -24,7 +26,7 @@
     <v-btn
       icon="mdi-plus"
       variant="tonal"
-      @click="model = round(model + step)"
+      @click="commit(round(model + step))"
     />
   </div>
 </template>
@@ -47,25 +49,53 @@
 
   const model = defineModel<number>({ required: true })
 
+  /** True while the field shows text that does not parse to a usable number. */
+  const invalid = defineModel<boolean>('invalid', { default: false })
+
   const text = ref(String(model.value))
 
   watch(model, value => {
-    if (Number.parseFloat(text.value) !== value) {
+    if (parse(text.value) !== value) {
       text.value = String(value)
+      invalid.value = false
     }
   })
+
+  function parse (value: string): number {
+    const normalized = value.trim().replace(',', '.')
+    if (normalized === '') {
+      return Number.NaN
+    }
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) && (props.decimal || Number.isInteger(parsed))
+      ? parsed
+      : Number.NaN
+  }
 
   function round (value: number): number {
     return Math.max(props.min, Math.round(value * 100) / 100)
   }
 
+  function commit (value: number) {
+    model.value = value
+    text.value = String(value)
+    invalid.value = false
+  }
+
   function onInput (value: string) {
     text.value = value
-    const parsed = props.decimal
-      ? Number.parseFloat(value.replace(',', '.'))
-      : Number.parseInt(value, 10)
-    if (!Number.isNaN(parsed) && parsed >= props.min) {
-      model.value = parsed
+    const parsed = parse(value)
+    if (Number.isNaN(parsed) || parsed < props.min) {
+      invalid.value = true
+      return
+    }
+    invalid.value = false
+    model.value = parsed
+  }
+
+  function onBlur () {
+    if (invalid.value) {
+      commit(model.value)
     }
   }
 </script>

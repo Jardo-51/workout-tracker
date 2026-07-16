@@ -21,7 +21,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## CRITICAL
 
-- [ ] **1. StepperField can save a value different from what is displayed** — `src/components/session/StepperField.vue:62-70`
+- [x] **1. StepperField can save a value different from what is displayed** — `src/components/session/StepperField.vue:62-70`
   `onInput` only commits to the model when the parsed value is valid and `>= min`; otherwise the
   text keeps showing whatever the user typed while the model silently keeps the *old* number.
   Examples: for Reps (`min: 1`), clearing the field or typing `0` shows `0`/empty, but Save stores
@@ -140,12 +140,12 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   (only etesync keys live there), a foot-gun the moment anything else is stored. Either rename the
   store `syncMeta2`/scope it, or delete only `etesync.*` keys.
 
-- [ ] **17. Stepper minus button can't reach `min` when the value isn't step-aligned** — `src/components/session/StepperField.vue:4`
+- [x] **17. Stepper minus button can't reach `min` when the value isn't step-aligned** — `src/components/session/StepperField.vue:4`
   Disable condition is `model - step < min`, so Weight = 1 kg with step 2.5 can never be
   decremented to 0 even though `round()` would clamp it. Disable on `model <= min` instead and let
   the clamp do its job.
 
-- [ ] **18. Decimal comma is rewritten to a dot mid-typing** — `src/components/session/StepperField.vue:52-56`
+- [x] **18. Decimal comma is rewritten to a dot mid-typing** — `src/components/session/StepperField.vue:52-56`
   `onInput` parses with `,`→`.` replacement but the `watch` that resyncs `text` compares with a
   plain `parseFloat`, so typing `7,5` snaps the field to `7.5`. Cosmetic, but jarring for
   comma-locale users; apply the same normalization in both places.
