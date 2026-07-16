@@ -156,6 +156,9 @@
       return
     }
     confirmDelete.value = false
+    weightInvalid.value = false
+    repsInvalid.value = false
+    setsInvalid.value = false
     if (props.editEntry) {
       name.value = props.editEntry.name
       weight.value = props.editEntry.weight
