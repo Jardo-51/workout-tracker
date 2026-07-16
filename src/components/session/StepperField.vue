@@ -61,9 +61,14 @@
   })
 
   function parse (value: string): number {
-    return props.decimal
-      ? Number.parseFloat(value.replace(',', '.'))
-      : Number.parseInt(value, 10)
+    const normalized = value.trim().replace(',', '.')
+    if (normalized === '') {
+      return Number.NaN
+    }
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) && (props.decimal || Number.isInteger(parsed))
+      ? parsed
+      : Number.NaN
   }
 
   function round (value: number): number {
