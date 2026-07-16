@@ -29,6 +29,7 @@
 
         <StepperField
           v-model="weight"
+          v-model:invalid="weightInvalid"
           decimal
           label="Weight"
           :step="weightStep"
@@ -46,12 +47,14 @@
 
         <StepperField
           v-model="reps"
+          v-model:invalid="repsInvalid"
           label="Reps"
           :min="1"
         />
 
         <StepperField
           v-model="sets"
+          v-model:invalid="setsInvalid"
           label="Sets"
           :min="1"
         />
@@ -130,6 +133,10 @@
   const tempo = ref<Tempo>([2, 0, 2, 0])
   const confirmDelete = ref(false)
 
+  const weightInvalid = ref(false)
+  const repsInvalid = ref(false)
+  const setsInvalid = ref(false)
+
   const weightStep = computed(() => weightUnit.value === 'kg' ? 2.5 : 5)
 
   const trimmedName = computed(() => name.value?.trim() ?? '')
@@ -138,7 +145,10 @@
     trimmedName.value.length > 0
     && weight.value >= 0
     && reps.value >= 1
-    && sets.value >= 1,
+    && sets.value >= 1
+    && !weightInvalid.value
+    && !repsInvalid.value
+    && !setsInvalid.value,
   )
 
   watch(open, isOpen => {
