@@ -57,6 +57,7 @@
   watch(model, value => {
     if (parse(text.value) !== value) {
       text.value = String(value)
+      invalid.value = false
     }
   })
 
