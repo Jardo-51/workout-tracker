@@ -107,6 +107,14 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   `putSession` resolves; if the write rejects (quota), the UI shows data that evaporates on
   reload, and the rejection surfaces only as an unhandled promise rejection. Add a top-level
   catch with a snackbar, and consider surfacing persist failures.
+  — _Both surfaced as error snackbars: the `load()` chain now has a `.catch`, and a rejected
+  write sets `storageError` on the sessions store, which App.vue watches. The write path also
+  no longer broadcasts to other tabs when the write failed — peers react by re-reading the
+  session, so announcing a write that never landed only wasted a read. Memory is deliberately
+  **not** rolled back to the stored version: mutations are fired from click handlers that never
+  await them, so by the time a rejection arrives the session may have been mutated again and
+  there is no version it would be correct to restore. The user is told the data is not saved;
+  reconciling it is not attempted._
 
 - [ ] **10. No automated tests for the sync engine** — project-wide
   `syncSessions`, the dirty-tracking via `syncedUpdatedAt`, tombstone propagation, and the stoken
@@ -144,9 +152,11 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   — _Folded into finding #2: `load()` now caches its promise, which also keeps the new
   cross-tab subscription from registering twice._
 
-- [ ] **15. `getDB` caches a rejected promise forever** — `src/services/db.ts:33-47`
+- [x] **15. `getDB` caches a rejected promise forever** — `src/services/db.ts:33-47`
   If `openDB` rejects once, every later call reuses the rejected `dbPromise` until a full reload.
   Reset `dbPromise` on rejection.
+  — _Folded into finding #9: retrying the open is what makes the new error snackbar actionable,
+  since some causes (a blocking upgrade in another tab, storage pressure) clear on their own._
 
 - [ ] **16. `clearSyncState` wipes the generic `meta` store** — `src/services/db.ts:81-85`
   The store is named/typed as generic app metadata but logout clears it wholesale. Fine today

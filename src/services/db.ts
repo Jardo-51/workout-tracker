@@ -42,6 +42,13 @@ function getDB (): Promise<IDBPDatabase<WorkoutDB>> {
         db.createObjectStore('meta')
       }
     },
+  }).catch((error: unknown) => {
+    // Holding on to the rejection would replay this one failure for the rest
+    // of the page's life; dropping it lets a later call retry the open. Some
+    // causes are transient (a blocking upgrade in another tab, storage
+    // pressure), so a retry is worth allowing.
+    dbPromise = undefined
+    throw error
   })
   return dbPromise
 }
