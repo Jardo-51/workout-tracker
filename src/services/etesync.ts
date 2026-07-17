@@ -1,4 +1,4 @@
-import type { Session } from '@/types/workout'
+import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import * as Etebase from 'etebase'
 import {
   getMeta,
@@ -65,9 +65,28 @@ export interface SyncResult {
 }
 
 /**
+ * Entries are checked as well as the session itself, because a pulled session
+ * is persisted: an entry the UI chokes on would crash on every app start from
+ * then on, which is the wedge this guard exists to avoid, just moved. Only the
+ * fields something actually dereferences are required — `name` is read for
+ * workout entries, and `id` keys the render loop — so an entry of a kind a
+ * future version adds still travels through this one intact.
+ */
+function isSessionEntry (value: unknown): value is SessionEntry {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const candidate = value as Partial<WorkoutEntry>
+  if (typeof candidate.id !== 'string') {
+    return false
+  }
+  return candidate.kind !== 'workout' || typeof candidate.name === 'string'
+}
+
+/**
  * Guards against content this version can't use: schema drift from a future
  * app version, or another client writing to the same collection. Only the
- * fields the sync engine itself relies on are checked.
+ * fields the sync engine and UI rely on are checked.
  */
 function isSession (value: unknown): value is Session {
   if (typeof value !== 'object' || value === null) {
@@ -77,6 +96,7 @@ function isSession (value: unknown): value is Session {
   return typeof candidate.id === 'string'
     && typeof candidate.updatedAt === 'number'
     && Array.isArray(candidate.entries)
+    && candidate.entries.every(isSessionEntry)
 }
 
 /**
