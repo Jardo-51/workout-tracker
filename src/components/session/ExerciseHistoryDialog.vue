@@ -6,7 +6,7 @@
   >
     <v-card>
       <v-toolbar color="primary">
-        <v-btn icon="mdi-close" @click="open = false" />
+        <v-btn icon="$close" @click="open = false" />
         <v-toolbar-title>{{ name }}</v-toolbar-title>
       </v-toolbar>
 
@@ -30,7 +30,7 @@
       </v-card-text>
 
       <v-card-text v-else class="text-center text-medium-emphasis mt-16">
-        <v-icon class="mb-4" icon="mdi-star-outline" size="64" />
+        <v-icon class="mb-4" icon="$starOutline" size="64" />
         <div class="text-h6">First time doing this one</div>
       </v-card-text>
     </v-card>

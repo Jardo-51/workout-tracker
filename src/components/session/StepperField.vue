@@ -2,7 +2,7 @@
   <div class="d-flex align-center ga-2 mb-3">
     <v-btn
       :disabled="model <= min"
-      icon="mdi-minus"
+      icon="$minus"
       variant="tonal"
       @click="commit(round(model - step))"
     />
@@ -24,7 +24,7 @@
     </v-text-field>
 
     <v-btn
-      icon="mdi-plus"
+      icon="$plus"
       variant="tonal"
       @click="commit(round(model + step))"
     />

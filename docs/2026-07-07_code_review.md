@@ -137,12 +137,21 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   Build workflow so style/correctness rules (the repo has a full eslint-config-vuetify setup)
   actually gate pushes.
 
-- [ ] **12. Font payload: 12 Roboto variants + full icon font precached** — `vite.config.mts:19-33`
+- [x] **12. Font payload: 12 Roboto variants + full icon font precached** — `vite.config.mts:19-33`
   unplugin-fonts loads Roboto in 6 weights × 2 styles, and `@mdi/font` ships the entire
   Material Design Icons font (~400 KB woff2 alone); `globPatterns` includes `woff2`, so all of it
   lands in every user's service-worker precache on install and after each deploy. Vuetify
   typically needs weights 400/500/700, rarely italics; and `@mdi/js` (tree-shaken SVG paths, via
   `aliases`/`sets` in the Vuetify config) would eliminate the icon font entirely.
+  — _Understated, if anything: fontsource emits each variant once per unicode subset, and there
+  are 8 of those, so the 12 variants were **96** Roboto files. Measured precached woff2 went from
+  1795 KB (97 files) to 340 KB (24), and the CSS bundle from 704 KB to 272 KB. Took both
+  suggestions: weights cut to 400/500/700 normal (grepped the templates — that is exactly what
+  the app renders; nothing uses italics or thin/black), and `@mdi/js` via `aliases`/`sets` with
+  the app's 13 icons named in `plugins/vuetify.ts`. Subsets are deliberately left alone: dropping
+  latin-ext would break accented exercise names. Removing the icon font also made the
+  `remove-mdi-font-preloads` vite plugin dead code, so it is gone. Verified in a real browser —
+  every `.v-icon` resolves to a non-empty SVG path, no webfont is requested, no console errors._
 
 - [x] **13. Logout during an in-flight sync resurrects sync bookkeeping** — `src/stores/sync.ts:67-84`
   `logout()` clears `syncMeta`/`meta` while a running `syncSessions` may still `putSyncMeta` /

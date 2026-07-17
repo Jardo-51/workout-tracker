@@ -1,12 +1,12 @@
 <template>
   <v-bottom-navigation grow>
     <v-btn to="/">
-      <v-icon>mdi-home</v-icon>
+      <v-icon icon="$home" />
       <span>Home</span>
     </v-btn>
 
     <v-btn to="/settings">
-      <v-icon>mdi-cog</v-icon>
+      <v-icon icon="$cog" />
       <span>Settings</span>
     </v-btn>
   </v-bottom-navigation>

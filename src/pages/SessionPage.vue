@@ -1,7 +1,7 @@
 <template>
   <v-container v-if="session" class="pa-4 session-page">
     <div class="d-flex align-center mb-1">
-      <v-btn icon="mdi-arrow-left" variant="text" @click="router.push('/')" />
+      <v-btn icon="$arrowLeft" variant="text" @click="router.push('/')" />
 
       <div class="flex-grow-1 ml-1">
         <div class="text-h6">{{ formatDateKey(session.dateKey) }}</div>
@@ -49,7 +49,7 @@
         role="button"
         @click="startEditingNote"
       >
-        <v-icon icon="mdi-note-edit-outline" size="small" />
+        <v-icon icon="$noteEdit" size="small" />
         {{ session.note || 'Add a note…' }}
       </div>
     </div>
@@ -73,7 +73,7 @@
       v-if="session.entries.length === 0"
       class="text-center text-medium-emphasis mt-12 mb-4"
     >
-      <v-icon class="mb-2" icon="mdi-dumbbell" size="48" />
+      <v-icon class="mb-2" icon="$dumbbell" size="48" />
       <div class="text-body-1">Add your first exercise</div>
     </div>
 
@@ -81,7 +81,7 @@
       <v-btn
         class="flex-grow-1"
         color="primary"
-        prepend-icon="mdi-plus"
+        prepend-icon="$plus"
         size="large"
         @click="openWorkoutAdd"
       >
@@ -91,7 +91,7 @@
       <v-btn
         class="flex-grow-1"
         color="secondary"
-        prepend-icon="mdi-timer-sand"
+        prepend-icon="$timerSand"
         size="large"
         variant="tonal"
         @click="openBreakAdd"
