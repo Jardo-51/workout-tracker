@@ -33,14 +33,21 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   let loadPromise: Promise<void> | undefined
 
+  async function loadSessions () {
+    sessions.value = await getAllSessions()
+    loaded.value = true
+    // Another tab writing the same IndexedDB would otherwise be invisible
+    // here, and our stale copy would overwrite its work on the next persist.
+    onSessionChanged(id => void reloadSession(id))
+  }
+
   function load (): Promise<void> {
-    loadPromise ??= (async () => {
-      sessions.value = await getAllSessions()
-      loaded.value = true
-      // Another tab writing the same IndexedDB would otherwise be invisible
-      // here, and our stale copy would overwrite its work on the next persist.
-      onSessionChanged(id => void reloadSession(id))
-    })()
+    loadPromise ??= loadSessions().catch(error => {
+      // Holding on to the rejection would replay this failure for every later
+      // caller; dropping it lets a retry re-read the DB.
+      loadPromise = undefined
+      throw error
+    })
     return loadPromise
   }
 
