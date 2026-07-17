@@ -41,12 +41,17 @@ export async function logout (account: Account): Promise<void> {
 }
 
 /**
- * Whether this run of the app has confirmed the cached collection against the
- * server yet. The cache exists to keep a list request off every sync; checking
- * it once per app start is cheap next to the syncs themselves, and is what
- * eventually pulls a device off a collection it lost the race for.
+ * Accounts whose cached collection has been confirmed against the server. The
+ * cache exists to keep a list request off every sync; checking it once is
+ * cheap next to the syncs themselves, and is what eventually pulls a device
+ * off a collection it lost the race for.
+ *
+ * Keyed by account rather than a plain flag because an account is built once
+ * per app start (the sync store restores one on its first sync), so a new one
+ * means the check is due again — including after a logout and a login as
+ * somebody else, where a stale answer would be the wrong account's.
  */
-let collectionChecked = false
+const collectionChecked = new WeakSet<Account>()
 
 /**
  * The collection a device syncs into, chosen identically everywhere: the
@@ -72,7 +77,7 @@ function pickCollection (candidates: Etebase.Collection[]): Etebase.Collection |
  *
  * The re-list still races — a device can create, re-list before the other
  * device's upload is visible, and cache a collection that later loses. So the
- * cache is confirmed once per app start too, and a device that finds itself on
+ * cache is confirmed once per account too, and a device that finds itself on
  * the loser drops its sync bookkeeping and re-pushes into the winner. That
  * bookkeeping is what marks a session as already synced; keeping it would
  * leave every session looking clean and silently strand them in the
@@ -81,7 +86,7 @@ function pickCollection (candidates: Etebase.Collection[]): Etebase.Collection |
 async function ensureCollection (account: Account) {
   const collectionManager = account.getCollectionManager()
   const cached = await getMeta<Uint8Array>(META_COLLECTION_CACHE)
-  if (cached && collectionChecked) {
+  if (cached && collectionChecked.has(account)) {
     return { collectionManager, collection: collectionManager.cacheLoad(cached) }
   }
 
@@ -95,7 +100,7 @@ async function ensureCollection (account: Account) {
     await collectionManager.upload(created)
     collection = pickCollection((await collectionManager.list(COLLECTION_TYPE)).data) ?? created
   }
-  collectionChecked = true
+  collectionChecked.add(account)
 
   const cachedUid = cached ? collectionManager.cacheLoad(cached).uid : undefined
   if (cachedUid && cachedUid !== collection.uid) {

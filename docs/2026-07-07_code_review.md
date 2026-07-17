@@ -125,12 +125,23 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   there is no version it would be correct to restore. The user is told the data is not saved;
   reconciling it is not attempted._
 
-- [ ] **10. No automated tests for the sync engine** — project-wide
+- [x] **10. No automated tests for the sync engine** — project-wide
   `syncSessions`, the dirty-tracking via `syncedUpdatedAt`, tombstone propagation, and the stoken
   pagination are exactly the kind of subtle logic that regresses silently (findings 3, 4, 7 all
   live there). The logic is already well-factored for testing (`applyRemote` is injected; the db
   layer is a thin module easy to fake). A vitest suite with a faked item manager would cover the
   pull/push matrix cheaply. The Playwright `verify` skill covers the happy path only.
+  — _26 vitest cases in `src/services/etesync.test.ts`, against an in-memory item manager
+  (`etesync.fake.ts`) and db (`db.fake.ts`); `pnpm test`, and CI runs it. Covers the pull/push
+  matrix, batching, stoken pagination, tombstones, and one case per subtlety the earlier findings
+  turned up: skipping malformed items without wedging (#3), the tie-break and the `- 1` that
+  keeps a local winner dirty (#4), and collection convergence plus the migration off a losing
+  cache (#7). The suite was checked by mutation rather than by watching it go green: reverting
+  `pickCollection` to `data[0]`, making `decodeSession` rethrow, dropping the `- 1`, making
+  `compareSessions` give up on ties, and stopping pagination after one page each fail exactly the
+  tests that describe them. One production change came out of writing it — the once-per-app-start
+  collection check is keyed on the account rather than a module flag, which is both what a test
+  can simulate a restart with and more correct after a re-login as a different user._
 
 - [x] **11. CI never runs the linter** — `.github/workflows/build.yml:27-32`
   `pnpm build` runs type-check + build, but `pnpm lint` is only ever run manually. Add it to the

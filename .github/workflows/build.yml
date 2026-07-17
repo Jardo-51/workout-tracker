@@ -36,6 +36,12 @@ jobs:
             pnpm lint
           "
 
+      - name: Test
+        run: |
+          nix develop --command bash -c "
+            pnpm test
+          "
+
       - name: Build
         run: |
           nix develop --command bash -c "
