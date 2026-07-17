@@ -41,7 +41,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   duplicate server items for one session. Consider a `BroadcastChannel` (or `storage` events) to
   propagate mutations, plus a Web Locks API guard around `syncSessions`.
 
-- [ ] **3. One malformed remote item permanently wedges sync** — `src/services/etesync.ts:82-108`
+- [x] **3. One malformed remote item permanently wedges sync** — `src/services/etesync.ts:82-108`
   In the pull loop, `JSON.parse(await item.getContent(...))` runs before the new `stoken` is
   persisted (`setMeta` happens only after the whole loop). If any item ever contains content that
   isn't valid JSON — or valid JSON that isn't a `Session` (schema drift from a future app version,

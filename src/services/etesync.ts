@@ -60,6 +60,42 @@ async function ensureCollection (account: Account) {
 export interface SyncResult {
   pulled: number
   pushed: number
+  /** Remote items that could not be read as a session and were skipped. */
+  skipped: number
+}
+
+/**
+ * Guards against content this version can't use: schema drift from a future
+ * app version, or another client writing to the same collection. Only the
+ * fields the sync engine itself relies on are checked.
+ */
+function isSession (value: unknown): value is Session {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const candidate = value as Partial<Session>
+  return typeof candidate.id === 'string'
+    && typeof candidate.updatedAt === 'number'
+    && Array.isArray(candidate.entries)
+}
+
+/**
+ * Returns undefined for an item this client can't make sense of. Such an item
+ * must never throw out of the pull loop: the stoken is saved only once the
+ * loop completes, so an item that always throws would make every future sync
+ * re-pull the same page and abort — wedging sync for good.
+ */
+async function decodeSession (item: Etebase.Item): Promise<Session | undefined> {
+  try {
+    const parsed: unknown = JSON.parse(await item.getContent(Etebase.OutputFormat.String))
+    if (isSession(parsed)) {
+      return parsed
+    }
+    console.warn('[sync] skipping remote item, not a session:', item.uid)
+  } catch (error) {
+    console.warn('[sync] skipping unreadable remote item:', item.uid, error)
+  }
+  return undefined
 }
 
 /**
@@ -78,6 +114,7 @@ export async function syncSessions (
 
   // Pull
   let pulled = 0
+  let skipped = 0
   let stoken = await getMeta<string>(META_STOKEN)
   for (;;) {
     const response = await itemManager.list({ stoken, limit: 50 })
@@ -85,7 +122,11 @@ export async function syncSessions (
       if (item.isDeleted) {
         continue
       }
-      const remote = JSON.parse(await item.getContent(Etebase.OutputFormat.String)) as Session
+      const remote = await decodeSession(item)
+      if (!remote) {
+        skipped++
+        continue
+      }
       const local = localSessions.find(s => s.id === remote.id)
       if (!local || remote.updatedAt > local.updatedAt) {
         await applyRemote(remote)
@@ -150,5 +191,5 @@ export async function syncSessions (
     pushed += batch.length
   }
 
-  return { pulled, pushed }
+  return { pulled, pushed, skipped }
 }
