@@ -1,6 +1,7 @@
 import type { Account } from '@/services/etesync'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { withSyncLock } from '@/services/broadcast'
 import { clearSyncState } from '@/services/db'
 import { useSessionsStore } from '@/stores/sessions'
 
@@ -104,7 +105,15 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const api = await etesync()
       account ??= await api.restoreAccount(savedSession.value!)
-      await api.syncSessions(account, sessionsStore.sessions, sessionsStore.upsertFromRemote)
+      const account_ = account
+      const ran = await withSyncLock(() =>
+        api.syncSessions(account_, sessionsStore.sessions, sessionsStore.upsertFromRemote),
+      )
+      if (!ran) {
+        // Another tab is syncing the same account; its results reach us over
+        // the broadcast channel.
+        return false
+      }
       lastSyncAt.value = Date.now()
       localStorage.setItem(LS_LAST_SYNC, String(lastSyncAt.value))
       error.value = ''

@@ -52,6 +52,11 @@ export async function getAllSessions (): Promise<Session[]> {
   return db.getAll('sessions')
 }
 
+export async function getSession (id: string): Promise<Session | undefined> {
+  const db = await getDB()
+  return db.get('sessions', id)
+}
+
 export async function putSession (session: Session): Promise<void> {
   const db = await getDB()
   await db.put('sessions', toPlain(session))

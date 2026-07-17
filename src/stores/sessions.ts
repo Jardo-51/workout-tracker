@@ -1,7 +1,8 @@
 import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { getAllSessions, putSession } from '@/services/db'
+import { broadcastSessionChanged, onSessionChanged } from '@/services/broadcast'
+import { getAllSessions, getSession as getStoredSession, putSession } from '@/services/db'
 import { toDateKey } from '@/utils/format'
 
 function normalizeName (name: string): string {
@@ -14,12 +15,40 @@ export const useSessionsStore = defineStore('sessions', () => {
   /** Bumped on every user-driven mutation; the sync store watches it. */
   const mutationCount = ref(0)
 
-  async function load () {
-    if (loaded.value) {
-      return
+  let loadPromise: Promise<void> | undefined
+
+  function load (): Promise<void> {
+    loadPromise ??= (async () => {
+      sessions.value = await getAllSessions()
+      loaded.value = true
+      // Another tab writing the same IndexedDB would otherwise be invisible
+      // here, and our stale copy would overwrite its work on the next persist.
+      onSessionChanged(id => void reloadSession(id))
+    })()
+    return loadPromise
+  }
+
+  /** Writes through to IndexedDB and lets other tabs know. */
+  async function store (session: Session) {
+    await putSession(session)
+    broadcastSessionChanged(session.id)
+  }
+
+  function mergeIntoMemory (session: Session) {
+    const index = sessions.value.findIndex(s => s.id === session.id)
+    if (index === -1) {
+      sessions.value.push(session)
+    } else {
+      sessions.value[index] = session
     }
-    sessions.value = await getAllSessions()
-    loaded.value = true
+  }
+
+  /** Pulls another tab's write into this tab's memory. */
+  async function reloadSession (id: string) {
+    const stored = await getStoredSession(id)
+    if (stored) {
+      mergeIntoMemory(stored)
+    }
   }
 
   const visibleSessions = computed(() =>
@@ -83,7 +112,7 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   async function persist (session: Session) {
     session.updatedAt = Date.now()
-    await putSession(session)
+    await store(session)
     mutationCount.value++
   }
 
@@ -92,13 +121,8 @@ export const useSessionsStore = defineStore('sessions', () => {
    * updatedAt bump) and does not count as a user mutation.
    */
   async function upsertFromRemote (session: Session) {
-    const index = sessions.value.findIndex(s => s.id === session.id)
-    if (index === -1) {
-      sessions.value.push(session)
-    } else {
-      sessions.value[index] = session
-    }
-    await putSession(session)
+    mergeIntoMemory(session)
+    await store(session)
   }
 
   async function startSession (): Promise<Session> {
@@ -111,7 +135,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       updatedAt: now,
     }
     sessions.value.push(session)
-    await putSession(session)
+    await store(session)
     mutationCount.value++
     return session
   }

@@ -32,7 +32,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## HIGH
 
-- [ ] **2. No multi-tab/multi-window coordination — concurrent tabs overwrite each other's data** — `src/stores/sessions.ts:17-23`, `src/stores/sync.ts`
+- [x] **2. No multi-tab/multi-window coordination — concurrent tabs overwrite each other's data** — `src/stores/sessions.ts:17-23`, `src/stores/sync.ts`
   Each tab loads all sessions into memory once (`load()`) and writes whole sessions back on every
   mutation. Two open tabs (a normal situation for a web-installed PWA on desktop) never see each
   other's changes: the tab with the stale in-memory copy overwrites the other tab's newer entries
@@ -126,10 +126,12 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## LOW
 
-- [ ] **14. `sessionsStore.load()` has a concurrency race** — `src/stores/sessions.ts:17-23`
+- [x] **14. `sessionsStore.load()` has a concurrency race** — `src/stores/sessions.ts:17-23`
   `loaded` is set only after the `await`, so two concurrent callers both fetch and the second
   assignment clobbers `sessions.value` (and any session started in between). Currently only
   App.vue calls it once; cache the promise instead of the boolean to make it safe.
+  — _Folded into finding #2: `load()` now caches its promise, which also keeps the new
+  cross-tab subscription from registering twice._
 
 - [ ] **15. `getDB` caches a rejected promise forever** — `src/services/db.ts:33-47`
   If `openDB` rejects once, every later call reuses the rejected `dbPromise` until a full reload.
