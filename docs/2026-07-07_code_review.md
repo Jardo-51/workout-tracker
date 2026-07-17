@@ -111,7 +111,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   layer is a thin module easy to fake). A vitest suite with a faked item manager would cover the
   pull/push matrix cheaply. The Playwright `verify` skill covers the happy path only.
 
-- [ ] **11. CI never runs the linter** — `.github/workflows/build.yml:27-32`
+- [x] **11. CI never runs the linter** — `.github/workflows/build.yml:27-32`
   `pnpm build` runs type-check + build, but `pnpm lint` is only ever run manually. Add it to the
   Build workflow so style/correctness rules (the repo has a full eslint-config-vuetify setup)
   actually gate pushes.
