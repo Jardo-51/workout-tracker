@@ -1,4 +1,4 @@
-import type { Session } from '@/types/workout'
+import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import * as Etebase from 'etebase'
 import {
   getMeta,
@@ -60,11 +60,90 @@ async function ensureCollection (account: Account) {
 export interface SyncResult {
   pulled: number
   pushed: number
+  /** Remote items that could not be read as a session and were skipped. */
+  skipped: number
 }
 
 /**
- * Two-way sync: pull remote changes since the saved stoken (last-write-wins
- * on session.updatedAt), then push every local session whose updatedAt is
+ * Entries are checked as well as the session itself, because a pulled session
+ * is persisted: an entry the UI chokes on would crash on every app start from
+ * then on, which is the wedge this guard exists to avoid, just moved. Only the
+ * fields something actually dereferences are required — `name` is read for
+ * workout entries, and `id` keys the render loop — so an entry of a kind a
+ * future version adds still travels through this one intact.
+ */
+function isSessionEntry (value: unknown): value is SessionEntry {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const candidate = value as Partial<WorkoutEntry>
+  if (typeof candidate.id !== 'string') {
+    return false
+  }
+  return candidate.kind !== 'workout' || typeof candidate.name === 'string'
+}
+
+/**
+ * Guards against content this version can't use: schema drift from a future
+ * app version, or another client writing to the same collection. Only the
+ * fields the sync engine and UI rely on are checked.
+ */
+function isSession (value: unknown): value is Session {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const candidate = value as Partial<Session>
+  return typeof candidate.id === 'string'
+    && typeof candidate.updatedAt === 'number'
+    && Array.isArray(candidate.entries)
+    && candidate.entries.every(isSessionEntry)
+}
+
+/**
+ * Returns undefined for an item this client can't make sense of. Such an item
+ * must never throw out of the pull loop: the stoken is saved only once the
+ * loop completes, so an item that always throws would make every future sync
+ * re-pull the same page and abort — wedging sync for good.
+ */
+async function decodeSession (item: Etebase.Item): Promise<Session | undefined> {
+  try {
+    const parsed: unknown = JSON.parse(await item.getContent(Etebase.OutputFormat.String))
+    if (isSession(parsed)) {
+      return parsed
+    }
+    console.warn('[sync] skipping remote item, not a session:', item.uid)
+  } catch (error) {
+    console.warn('[sync] skipping unreadable remote item:', item.uid, error)
+  }
+  return undefined
+}
+
+/**
+ * Total order over two versions of a session, computed identically on every
+ * device: the newer `updatedAt` wins, and on a tie the lexicographically
+ * larger serialization does.
+ *
+ * Ties are not a corner case. `nextUpdatedAt` derives the stamp from the
+ * session's own previous value, so two devices editing the same synced copy
+ * while their clocks sit at or behind it both produce the same stamp. Ordering
+ * on `updatedAt` alone would then leave each device keeping its own version
+ * and recording it as synced — diverging permanently, with neither side aware.
+ */
+function compareSessions (a: Session, b: Session): number {
+  if (a.updatedAt !== b.updatedAt) {
+    return a.updatedAt - b.updatedAt
+  }
+  const contentA = JSON.stringify(a)
+  const contentB = JSON.stringify(b)
+  if (contentA === contentB) {
+    return 0
+  }
+  return contentA < contentB ? -1 : 1
+}
+
+/**
+ * Two-way sync: pull remote changes since the saved stoken (conflicts resolved
+ * by `compareSessions`), then push every local session whose updatedAt is
  * newer than what the server has seen. Tombstoned sessions sync like any
  * other session, so deletions propagate.
  */
@@ -78,6 +157,7 @@ export async function syncSessions (
 
   // Pull
   let pulled = 0
+  let skipped = 0
   let stoken = await getMeta<string>(META_STOKEN)
   for (;;) {
     const response = await itemManager.list({ stoken, limit: 50 })
@@ -85,19 +165,25 @@ export async function syncSessions (
       if (item.isDeleted) {
         continue
       }
-      const remote = JSON.parse(await item.getContent(Etebase.OutputFormat.String)) as Session
+      const remote = await decodeSession(item)
+      if (!remote) {
+        skipped++
+        continue
+      }
       const local = localSessions.find(s => s.id === remote.id)
-      if (!local || remote.updatedAt > local.updatedAt) {
+      const order = local ? compareSessions(remote, local) : 1
+      if (order > 0) {
         await applyRemote(remote)
         pulled++
       }
-      // If the local copy is newer, syncedUpdatedAt < local.updatedAt keeps it
-      // dirty and the push phase below overwrites the server (last write wins).
       await putSyncMeta({
         sessionId: remote.id,
         itemUid: item.uid,
         cache: itemManager.cacheSave(item),
-        syncedUpdatedAt: remote.updatedAt,
+        // A local copy that beat the remote has to stay dirty so the push phase
+        // below overwrites the server. Recording the remote stamp would mark it
+        // clean whenever the two stamps are equal, stranding it here forever.
+        syncedUpdatedAt: order < 0 ? remote.updatedAt - 1 : remote.updatedAt,
       })
     }
     stoken = response.stoken ?? stoken
@@ -150,5 +236,5 @@ export async function syncSessions (
     pushed += batch.length
   }
 
-  return { pulled, pushed }
+  return { pulled, pushed, skipped }
 }

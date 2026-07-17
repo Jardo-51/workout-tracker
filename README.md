@@ -63,6 +63,14 @@ after each change and whenever the app comes back online; changes made offline
 are pushed on reconnect. Conflicts resolve last-write-wins per session, and
 deletions propagate. Logging out keeps all local data.
 
+Last-write-wins is decided by each session's `updatedAt` stamp, which is kept
+strictly increasing per session rather than read straight off the clock — a
+device whose clock jumps backwards can't lose its own newer edits, and an edit
+based on a session pulled from a device running ahead still wins. Resolution is
+per whole session, though: if the *same* session is edited on two devices
+between syncs, the losing device's entries for it are discarded rather than
+merged.
+
 ## Dark Mode
 
 - Toggle between light and dark themes from settings

@@ -32,7 +32,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## HIGH
 
-- [ ] **2. No multi-tab/multi-window coordination — concurrent tabs overwrite each other's data** — `src/stores/sessions.ts:17-23`, `src/stores/sync.ts`
+- [x] **2. No multi-tab/multi-window coordination — concurrent tabs overwrite each other's data** — `src/stores/sessions.ts:17-23`, `src/stores/sync.ts`
   Each tab loads all sessions into memory once (`load()`) and writes whole sessions back on every
   mutation. Two open tabs (a normal situation for a web-installed PWA on desktop) never see each
   other's changes: the tab with the stale in-memory copy overwrites the other tab's newer entries
@@ -41,7 +41,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   duplicate server items for one session. Consider a `BroadcastChannel` (or `storage` events) to
   propagate mutations, plus a Web Locks API guard around `syncSessions`.
 
-- [ ] **3. One malformed remote item permanently wedges sync** — `src/services/etesync.ts:82-108`
+- [x] **3. One malformed remote item permanently wedges sync** — `src/services/etesync.ts:82-108`
   In the pull loop, `JSON.parse(await item.getContent(...))` runs before the new `stoken` is
   persisted (`setMeta` happens only after the whole loop). If any item ever contains content that
   isn't valid JSON — or valid JSON that isn't a `Session` (schema drift from a future app version,
@@ -50,7 +50,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   there. Wrap per-item processing in a try/catch (skip + surface a warning), and validate the
   parsed object minimally (has `id`, `updatedAt`, `entries`) before applying.
 
-- [ ] **4. Conflict resolution trusts the client wall clock** — `src/stores/sessions.ts:84-88`, `src/services/etesync.ts:90`
+- [x] **4. Conflict resolution trusts the client wall clock** — `src/stores/sessions.ts:84-88`, `src/services/etesync.ts:90`
   Last-write-wins compares `session.updatedAt` values produced by `Date.now()` on different
   devices. A device with a skewed clock (manually set, drifted, wrong timezone fix-ups) silently
   loses genuinely newer edits, and because LWW is per whole session, a lost write discards *all*
@@ -58,6 +58,13 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   riskiest property of the design. Mitigations to consider: per-entry merging (union of entries by
   `id`, tombstones per entry), or at least a monotonic counter (`updatedAt = max(Date.now(),
   updatedAt + 1)`) so a backwards-jumping clock can't lose edits made on the same device.
+  — _Took the monotonic counter (`nextUpdatedAt` in the sessions store), not per-entry merging.
+  Because a pulled session carries the writing device's stamp, deriving the next stamp from it
+  also fixes the cross-device case the finding describes: an edit made on a slow-clocked device
+  now supersedes one from a device running ahead, rather than being silently dropped. The
+  per-whole-session granularity stands — two devices editing the same session between syncs still
+  costs the loser its entries. Per-entry merging with tombstones is a substantial redesign; it is
+  now the documented residual risk (README) rather than an undocumented one._
 
 ## MEDIUM
 
@@ -126,10 +133,12 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## LOW
 
-- [ ] **14. `sessionsStore.load()` has a concurrency race** — `src/stores/sessions.ts:17-23`
+- [x] **14. `sessionsStore.load()` has a concurrency race** — `src/stores/sessions.ts:17-23`
   `loaded` is set only after the `await`, so two concurrent callers both fetch and the second
   assignment clobbers `sessions.value` (and any session started in between). Currently only
   App.vue calls it once; cache the promise instead of the boolean to make it safe.
+  — _Folded into finding #2: `load()` now caches its promise, which also keeps the new
+  cross-tab subscription from registering twice._
 
 - [ ] **15. `getDB` caches a rejected promise forever** — `src/services/db.ts:33-47`
   If `openDB` rejects once, every later call reuses the rejected `dbPromise` until a full reload.

@@ -1,11 +1,28 @@
 import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { getAllSessions, putSession } from '@/services/db'
+import { broadcastSessionChanged, onSessionChanged } from '@/services/broadcast'
+import { getAllSessions, getSession as getStoredSession, putSession } from '@/services/db'
 import { toDateKey } from '@/utils/format'
 
 function normalizeName (name: string): string {
   return name.trim().toLowerCase()
+}
+
+/**
+ * Sync resolves conflicts last-write-wins on `updatedAt`, so a wall clock that
+ * jumps backwards would make an edit look older than the version it replaces
+ * and silently lose it. Deriving the stamp from the session's own previous
+ * value keeps it strictly increasing regardless of the clock. Because a pulled
+ * session carries the writing device's stamp, this also lets an edit made on a
+ * device with a slow clock win over one from a device running ahead.
+ *
+ * The flip side is that two devices editing the same synced copy under a
+ * lagging clock produce the *same* stamp; `compareSessions` in the sync service
+ * breaks that tie on content so both still converge on one winner.
+ */
+function nextUpdatedAt (session: Session): number {
+  return Math.max(Date.now(), session.updatedAt + 1)
 }
 
 export const useSessionsStore = defineStore('sessions', () => {
@@ -14,12 +31,53 @@ export const useSessionsStore = defineStore('sessions', () => {
   /** Bumped on every user-driven mutation; the sync store watches it. */
   const mutationCount = ref(0)
 
-  async function load () {
-    if (loaded.value) {
-      return
-    }
+  let loadPromise: Promise<void> | undefined
+
+  async function loadSessions () {
     sessions.value = await getAllSessions()
     loaded.value = true
+    // Another tab writing the same IndexedDB would otherwise be invisible
+    // here, and our stale copy would overwrite its work on the next persist.
+    onSessionChanged(id => void reloadSession(id))
+  }
+
+  function load (): Promise<void> {
+    loadPromise ??= loadSessions().catch(error => {
+      // Holding on to the rejection would replay this failure for every later
+      // caller; dropping it lets a retry re-read the DB.
+      loadPromise = undefined
+      throw error
+    })
+    return loadPromise
+  }
+
+  /** Writes through to IndexedDB and lets other tabs know. */
+  async function store (session: Session) {
+    await putSession(session)
+    broadcastSessionChanged(session.id)
+  }
+
+  function mergeIntoMemory (session: Session) {
+    const index = sessions.value.findIndex(s => s.id === session.id)
+    if (index === -1) {
+      sessions.value.push(session)
+    } else {
+      sessions.value[index] = session
+    }
+  }
+
+  /**
+   * Pulls another tab's write into this tab's memory. The stamp comparison is
+   * load-bearing: a tab never hears its own broadcast, so a peer's older write
+   * can land while our own newer put is still in flight, and reading the DB
+   * unconditionally would replace our copy with the version it supersedes.
+   */
+  async function reloadSession (id: string) {
+    const stored = await getStoredSession(id)
+    const current = sessions.value.find(s => s.id === id)
+    if (stored && (!current || stored.updatedAt >= current.updatedAt)) {
+      mergeIntoMemory(stored)
+    }
   }
 
   const visibleSessions = computed(() =>
@@ -82,8 +140,8 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   async function persist (session: Session) {
-    session.updatedAt = Date.now()
-    await putSession(session)
+    session.updatedAt = nextUpdatedAt(session)
+    await store(session)
     mutationCount.value++
   }
 
@@ -92,13 +150,8 @@ export const useSessionsStore = defineStore('sessions', () => {
    * updatedAt bump) and does not count as a user mutation.
    */
   async function upsertFromRemote (session: Session) {
-    const index = sessions.value.findIndex(s => s.id === session.id)
-    if (index === -1) {
-      sessions.value.push(session)
-    } else {
-      sessions.value[index] = session
-    }
-    await putSession(session)
+    mergeIntoMemory(session)
+    await store(session)
   }
 
   async function startSession (): Promise<Session> {
@@ -111,7 +164,7 @@ export const useSessionsStore = defineStore('sessions', () => {
       updatedAt: now,
     }
     sessions.value.push(session)
-    await putSession(session)
+    await store(session)
     mutationCount.value++
     return session
   }
