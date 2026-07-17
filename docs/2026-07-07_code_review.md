@@ -87,7 +87,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   plainly that being logged in means trusting the device, and that the encryption covers transit
   and the server rather than the device._
 
-- [ ] **6. CSP may block libsodium's WebAssembly** — `public/.htaccess:13`
+- [x] **6. CSP may block libsodium's WebAssembly** — `public/.htaccess:13`
   `etebase` depends on libsodium, which compiles a wasm module at startup. Chromium requires
   `'wasm-unsafe-eval'` in `script-src` for `WebAssembly.instantiate`; with plain
   `script-src 'self'` libsodium either falls back to the much slower asm.js build or fails
@@ -120,7 +120,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   the key `"Hold"`. Vue logs a duplicate-key warning and keyed patching can mis-match nodes. Use
   `:key="i"` or give the labels distinct ids.
 
-- [ ] **9. IndexedDB failures are invisible and leave memory/DB diverged** — `src/App.vue:32`, `src/stores/sessions.ts:84-88`
+- [x] **9. IndexedDB failures are invisible and leave memory/DB diverged** — `src/App.vue:32`, `src/stores/sessions.ts:84-88`
   `sessions.load().then(() => sync.init())` has no `.catch` — if IDB is unavailable (e.g. some
   private-browsing modes, storage pressure), the app renders an empty state with no explanation
   and `sync.init()` never runs. Similarly, every mutation updates the reactive state *before*
