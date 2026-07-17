@@ -91,7 +91,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   shown. Consider: after upload, re-list and prefer a deterministic winner (e.g. lowest uid),
   migrating items if the local cache points at the loser.
 
-- [ ] **8. Duplicate `v-for` key in TempoInput** — `src/components/session/TempoInput.vue:9-11,46`
+- [x] **8. Duplicate `v-for` key in TempoInput** — `src/components/session/TempoInput.vue:9-11,46`
   `labels = ['Down', 'Hold', 'Up', 'Hold']` is rendered with `:key="label"`, so two columns share
   the key `"Hold"`. Vue logs a duplicate-key warning and keyed patching can mis-match nodes. Use
   `:key="i"` or give the labels distinct ids.

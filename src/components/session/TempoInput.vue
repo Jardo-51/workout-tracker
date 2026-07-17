@@ -7,7 +7,7 @@
     <v-row dense>
       <v-col
         v-for="(label, i) in labels"
-        :key="label"
+        :key="i"
         class="text-center"
         cols="3"
       >
