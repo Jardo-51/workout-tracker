@@ -50,7 +50,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   there. Wrap per-item processing in a try/catch (skip + surface a warning), and validate the
   parsed object minimally (has `id`, `updatedAt`, `entries`) before applying.
 
-- [ ] **4. Conflict resolution trusts the client wall clock** — `src/stores/sessions.ts:84-88`, `src/services/etesync.ts:90`
+- [x] **4. Conflict resolution trusts the client wall clock** — `src/stores/sessions.ts:84-88`, `src/services/etesync.ts:90`
   Last-write-wins compares `session.updatedAt` values produced by `Date.now()` on different
   devices. A device with a skewed clock (manually set, drifted, wrong timezone fix-ups) silently
   loses genuinely newer edits, and because LWW is per whole session, a lost write discards *all*
@@ -58,6 +58,13 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   riskiest property of the design. Mitigations to consider: per-entry merging (union of entries by
   `id`, tombstones per entry), or at least a monotonic counter (`updatedAt = max(Date.now(),
   updatedAt + 1)`) so a backwards-jumping clock can't lose edits made on the same device.
+  — _Took the monotonic counter (`nextUpdatedAt` in the sessions store), not per-entry merging.
+  Because a pulled session carries the writing device's stamp, deriving the next stamp from it
+  also fixes the cross-device case the finding describes: an edit made on a slow-clocked device
+  now supersedes one from a device running ahead, rather than being silently dropped. The
+  per-whole-session granularity stands — two devices editing the same session between syncs still
+  costs the loser its entries. Per-entry merging with tombstones is a substantial redesign; it is
+  now the documented residual risk (README) rather than an undocumented one._
 
 ## MEDIUM
 

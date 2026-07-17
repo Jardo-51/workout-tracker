@@ -31,7 +31,11 @@ export interface Session {
   note?: string
   /** Array order is the chronological order within the session. */
   entries: SessionEntry[]
-  /** Bumped on every mutation; used by the future sync layer to diff. */
+  /**
+   * Bumped on every mutation; sync diffs on it and resolves conflicts
+   * last-write-wins. Strictly increasing per session rather than a plain
+   * `Date.now()` — see `nextUpdatedAt` in the sessions store.
+   */
   updatedAt: number
   /** Tombstone: kept in the DB for sync, hidden in the UI. */
   deleted?: boolean

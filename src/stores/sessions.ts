@@ -9,6 +9,18 @@ function normalizeName (name: string): string {
   return name.trim().toLowerCase()
 }
 
+/**
+ * Sync resolves conflicts last-write-wins on `updatedAt`, so a wall clock that
+ * jumps backwards would make an edit look older than the version it replaces
+ * and silently lose it. Deriving the stamp from the session's own previous
+ * value keeps it strictly increasing regardless of the clock. Because a pulled
+ * session carries the writing device's stamp, this also lets an edit made on a
+ * device with a slow clock win over one from a device running ahead.
+ */
+function nextUpdatedAt (session: Session): number {
+  return Math.max(Date.now(), session.updatedAt + 1)
+}
+
 export const useSessionsStore = defineStore('sessions', () => {
   const sessions = ref<Session[]>([])
   const loaded = ref(false)
@@ -111,7 +123,7 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   async function persist (session: Session) {
-    session.updatedAt = Date.now()
+    session.updatedAt = nextUpdatedAt(session)
     await store(session)
     mutationCount.value++
   }
