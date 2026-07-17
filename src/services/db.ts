@@ -2,6 +2,13 @@ import type { Session } from '@/types/workout'
 import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB } from 'idb'
 
+/**
+ * Prefix for the keys in the generic `meta` store that belong to the sync
+ * service. `clearSyncState` removes exactly these, so anything stored under
+ * another prefix survives a logout.
+ */
+export const SYNC_META_PREFIX = 'etesync.'
+
 /** Etebase sync bookkeeping for one session. */
 export interface SessionSyncMeta {
   sessionId: string
@@ -89,11 +96,20 @@ export async function setMeta (key: string, value: unknown): Promise<void> {
   await db.put('meta', value, key)
 }
 
-/** Drops all sync bookkeeping (on logout). Sessions themselves are kept. */
+/**
+ * Drops all sync bookkeeping (on logout). Sessions themselves are kept.
+ *
+ * `meta` is generic app metadata, so only the sync service's own keys are
+ * removed; clearing the store wholesale would silently discard anything else
+ * that comes to live there.
+ */
 export async function clearSyncState (): Promise<void> {
   const db = await getDB()
   await db.clear('syncMeta')
-  await db.clear('meta')
+  const keys = await db.getAllKeys('meta')
+  await Promise.all(
+    keys.filter(key => key.startsWith(SYNC_META_PREFIX)).map(key => db.delete('meta', key)),
+  )
 }
 
 /**

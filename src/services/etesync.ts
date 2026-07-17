@@ -5,13 +5,16 @@ import {
   getSyncMeta,
   putSyncMeta,
   setMeta,
+  SYNC_META_PREFIX,
 } from '@/services/db'
 
 const COLLECTION_TYPE = 'workout-tracker.sessions'
 const ITEM_TYPE = 'workout-session'
 const BATCH_SIZE = 20
-const META_COLLECTION_CACHE = 'etesync.collectionCache'
-const META_STOKEN = 'etesync.stoken'
+// Built from the prefix so logout keeps clearing them: clearSyncState drops
+// exactly the `meta` keys that carry it.
+const META_COLLECTION_CACHE = `${SYNC_META_PREFIX}collectionCache`
+const META_STOKEN = `${SYNC_META_PREFIX}stoken`
 
 export type Account = Etebase.Account
 

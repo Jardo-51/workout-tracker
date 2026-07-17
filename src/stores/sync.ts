@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import { withSyncLock } from '@/services/broadcast'
 import { clearSyncState } from '@/services/db'
 import { useSessionsStore } from '@/stores/sessions'
+import { errorMessage } from '@/utils/error'
 
 /** Default server used by official Etesync 2.0 accounts. */
 export const DEFAULT_SERVER_URL = 'https://api.etebase.com/partner/etesync/'
@@ -38,6 +39,8 @@ export const useSyncStore = defineStore('sync', () => {
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
   let syncQueued = false
   let initialized = false
+  /** The currently running `syncNow`, so `logout` can wait it out. */
+  let inFlightSync: Promise<boolean> | undefined
 
   function init () {
     if (initialized) {
@@ -68,16 +71,30 @@ export const useSyncStore = defineStore('sync', () => {
   async function logout () {
     const current = account
     account = undefined
+    // Dropping the saved session first makes `configured` false, which is what
+    // stops syncNow and requestSync from starting anything new from here on.
     savedSession.value = null
+    localStorage.removeItem(LS_SESSION)
+    clearTimeout(debounceTimer)
+
+    // Everything below has to wait for a sync that is already running: it
+    // finishes by writing the stoken and item caches it collected for the old
+    // account, and by stamping lastSyncAt. Clearing first would leave those
+    // writes to land afterwards, and a later login on a *different* account
+    // would then load a cached collection belonging to this one and fail
+    // confusingly. runSync resolves rather than rejects, so there is nothing
+    // to catch here.
+    await inFlightSync
+
     username.value = ''
     serverUrl.value = ''
     lastSyncAt.value = undefined
     error.value = ''
-    localStorage.removeItem(LS_SESSION)
     localStorage.removeItem(LS_USERNAME)
     localStorage.removeItem(LS_SERVER)
     localStorage.removeItem(LS_LAST_SYNC)
     await clearSyncState()
+
     if (current) {
       const api = await etesync()
       await api.logout(current)
@@ -102,6 +119,22 @@ export const useSyncStore = defineStore('sync', () => {
       return false
     }
     syncing.value = true
+    const run = runSync()
+    inFlightSync = run
+    try {
+      return await run
+    } finally {
+      inFlightSync = undefined
+      syncing.value = false
+      if (syncQueued) {
+        syncQueued = false
+        requestSync()
+      }
+    }
+  }
+
+  /** The sync itself; `syncNow` owns the single-flight guard around it. */
+  async function runSync (): Promise<boolean> {
     try {
       const api = await etesync()
       account ??= await api.restoreAccount(savedSession.value!)
@@ -121,14 +154,8 @@ export const useSyncStore = defineStore('sync', () => {
       error.value = ''
       return true
     } catch (error_) {
-      error.value = error_ instanceof Error ? error_.message : String(error_)
+      error.value = errorMessage(error_)
       return false
-    } finally {
-      syncing.value = false
-      if (syncQueued) {
-        syncQueued = false
-        requestSync()
-      }
     }
   }
 

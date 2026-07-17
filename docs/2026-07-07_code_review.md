@@ -135,13 +135,19 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   typically needs weights 400/500/700, rarely italics; and `@mdi/js` (tree-shaken SVG paths, via
   `aliases`/`sets` in the Vuetify config) would eliminate the icon font entirely.
 
-- [ ] **13. Logout during an in-flight sync resurrects sync bookkeeping** — `src/stores/sync.ts:67-84`
+- [x] **13. Logout during an in-flight sync resurrects sync bookkeeping** — `src/stores/sync.ts:67-84`
   `logout()` clears `syncMeta`/`meta` while a running `syncSessions` may still `putSyncMeta` /
   `setMeta` afterwards, leaving orphaned rows (stale collection cache, stoken, item caches) that a
   *future* login on a different account would then trust — `ensureCollection` would load a cached
   collection belonging to the old account and fail confusingly. Await/cancel the in-flight sync
   before clearing (e.g. keep the `syncNow` promise and `await` it in `logout`), or guard db writes
   with an epoch/generation check.
+  — _Took the await, not the epoch check: `syncNow` now keeps its run in `inFlightSync` and
+  `logout` waits on it. Ordering inside `logout` turned out to matter beyond what the finding
+  describes — a sync that *succeeds* mid-logout also re-stamps `lastSyncAt` and rewrites its
+  localStorage key, so only the saved session (which is what makes `configured` false and stops
+  new runs from starting) is dropped before the await; every other clear happens after it. The
+  single-flight guard moved out into `syncNow`, leaving the sync body as `runSync`._
 
 ## LOW
 
@@ -158,10 +164,13 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   — _Folded into finding #9: retrying the open is what makes the new error snackbar actionable,
   since some causes (a blocking upgrade in another tab, storage pressure) clear on their own._
 
-- [ ] **16. `clearSyncState` wipes the generic `meta` store** — `src/services/db.ts:81-85`
+- [x] **16. `clearSyncState` wipes the generic `meta` store** — `src/services/db.ts:81-85`
   The store is named/typed as generic app metadata but logout clears it wholesale. Fine today
   (only etesync keys live there), a foot-gun the moment anything else is stored. Either rename the
   store `syncMeta2`/scope it, or delete only `etesync.*` keys.
+  — _Folded into finding #13, since both are about logout clearing more than it should. Deletes
+  only the `etesync.*` keys; the prefix is now exported as `SYNC_META_PREFIX` and the etesync
+  service builds its key names from it, so the two cannot drift apart._
 
 - [x] **17. Stepper minus button can't reach `min` when the value isn't step-aligned** — `src/components/session/StepperField.vue:4`
   Disable condition is `model - step < min`, so Weight = 1 kg with step 2.5 can never be
