@@ -59,10 +59,16 @@ export const useSessionsStore = defineStore('sessions', () => {
     }
   }
 
-  /** Pulls another tab's write into this tab's memory. */
+  /**
+   * Pulls another tab's write into this tab's memory. The stamp comparison is
+   * load-bearing: a tab never hears its own broadcast, so a peer's older write
+   * can land while our own newer put is still in flight, and reading the DB
+   * unconditionally would replace our copy with the version it supersedes.
+   */
   async function reloadSession (id: string) {
     const stored = await getStoredSession(id)
-    if (stored) {
+    const current = sessions.value.find(s => s.id === id)
+    if (stored && (!current || stored.updatedAt >= current.updatedAt)) {
       mergeIntoMemory(stored)
     }
   }
