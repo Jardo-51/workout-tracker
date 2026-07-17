@@ -87,13 +87,22 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   Not verified against the production server — the header only takes effect once deployed, so
   that check is still worth doing on the next deploy._
 
-- [ ] **7. First-login race can create two collections (split-brain sync)** — `src/services/etesync.ts:39-58`
+- [x] **7. First-login race can create two collections (split-brain sync)** — `src/services/etesync.ts:39-58`
   `ensureCollection` does list → create → upload without any uniqueness guarantee. If two fresh
   devices log in around the same time, both see an empty list and each uploads its own
   `workout-tracker.sessions` collection. Afterwards `existing.data[0]` may resolve differently per
   device, so the two devices sync into different collections and never converge — with no error
   shown. Consider: after upload, re-list and prefer a deterministic winner (e.g. lowest uid),
   migrating items if the local cache points at the loser.
+  — _Took both halves. Re-lists after upload and every device picks the lowest uid, so the
+  winner is the same everywhere; a collection that loses is only ever the empty one just
+  created, so abandoning it strands nothing. The re-list alone does **not** close the race
+  though — a device can create, re-list before the other's upload is visible, and cache a
+  collection that later loses — so the cache is also confirmed against the server once per app
+  start, and a device on the loser drops its sync bookkeeping and re-pushes into the winner.
+  Dropping the bookkeeping is the load-bearing part of that migration: it is what marks a
+  session as synced, so keeping it would leave every session looking clean and strand them in
+  the abandoned collection. The extra cost is one list request per app start, not per sync._
 
 - [x] **8. Duplicate `v-for` key in TempoInput** — `src/components/session/TempoInput.vue:9-11,46`
   `labels = ['Down', 'Hold', 'Up', 'Hold']` is rendered with `:key="label"`, so two columns share
