@@ -110,8 +110,10 @@ export const useSyncStore = defineStore('sync', () => {
         api.syncSessions(account_, sessionsStore.sessions, sessionsStore.upsertFromRemote),
       )
       if (!ran) {
-        // Another tab is syncing the same account; its results reach us over
-        // the broadcast channel.
+        // Another tab is syncing the same account; its pulls reach us over the
+        // broadcast channel, but our own dirty sessions still need a push — the
+        // winning tab may have collected its dirty list before we got here.
+        requestSync()
         return false
       }
       lastSyncAt.value = Date.now()
