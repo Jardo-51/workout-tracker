@@ -16,6 +16,10 @@ function normalizeName (name: string): string {
  * value keeps it strictly increasing regardless of the clock. Because a pulled
  * session carries the writing device's stamp, this also lets an edit made on a
  * device with a slow clock win over one from a device running ahead.
+ *
+ * The flip side is that two devices editing the same synced copy under a
+ * lagging clock produce the *same* stamp; `compareSessions` in the sync service
+ * breaks that tie on content so both still converge on one winner.
  */
 function nextUpdatedAt (session: Session): number {
   return Math.max(Date.now(), session.updatedAt + 1)

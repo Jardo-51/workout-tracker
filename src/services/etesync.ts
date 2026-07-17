@@ -99,8 +99,31 @@ async function decodeSession (item: Etebase.Item): Promise<Session | undefined> 
 }
 
 /**
- * Two-way sync: pull remote changes since the saved stoken (last-write-wins
- * on session.updatedAt), then push every local session whose updatedAt is
+ * Total order over two versions of a session, computed identically on every
+ * device: the newer `updatedAt` wins, and on a tie the lexicographically
+ * larger serialization does.
+ *
+ * Ties are not a corner case. `nextUpdatedAt` derives the stamp from the
+ * session's own previous value, so two devices editing the same synced copy
+ * while their clocks sit at or behind it both produce the same stamp. Ordering
+ * on `updatedAt` alone would then leave each device keeping its own version
+ * and recording it as synced — diverging permanently, with neither side aware.
+ */
+function compareSessions (a: Session, b: Session): number {
+  if (a.updatedAt !== b.updatedAt) {
+    return a.updatedAt - b.updatedAt
+  }
+  const contentA = JSON.stringify(a)
+  const contentB = JSON.stringify(b)
+  if (contentA === contentB) {
+    return 0
+  }
+  return contentA < contentB ? -1 : 1
+}
+
+/**
+ * Two-way sync: pull remote changes since the saved stoken (conflicts resolved
+ * by `compareSessions`), then push every local session whose updatedAt is
  * newer than what the server has seen. Tombstoned sessions sync like any
  * other session, so deletions propagate.
  */
@@ -128,17 +151,19 @@ export async function syncSessions (
         continue
       }
       const local = localSessions.find(s => s.id === remote.id)
-      if (!local || remote.updatedAt > local.updatedAt) {
+      const order = local ? compareSessions(remote, local) : 1
+      if (order > 0) {
         await applyRemote(remote)
         pulled++
       }
-      // If the local copy is newer, syncedUpdatedAt < local.updatedAt keeps it
-      // dirty and the push phase below overwrites the server (last write wins).
       await putSyncMeta({
         sessionId: remote.id,
         itemUid: item.uid,
         cache: itemManager.cacheSave(item),
-        syncedUpdatedAt: remote.updatedAt,
+        // A local copy that beat the remote has to stay dirty so the push phase
+        // below overwrites the server. Recording the remote stamp would mark it
+        // clean whenever the two stamps are equal, stranding it here forever.
+        syncedUpdatedAt: order < 0 ? remote.updatedAt - 1 : remote.updatedAt,
       })
     }
     stoken = response.stoken ?? stoken
