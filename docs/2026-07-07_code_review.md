@@ -82,6 +82,10 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   `script-src 'self'` libsodium either falls back to the much slower asm.js build or fails
   outright depending on version. Verify login/sync against the production server with this exact
   header; likely fix is `script-src 'self' 'wasm-unsafe-eval'`.
+  — _Confirmed the premise before fixing: etebase bundles libsodium-wrappers, and its dist calls
+  `WebAssembly.instantiate`/`instantiateStreaming`. Added `'wasm-unsafe-eval'` to `script-src`.
+  Not verified against the production server — the header only takes effect once deployed, so
+  that check is still worth doing on the next deploy._
 
 - [ ] **7. First-login race can create two collections (split-brain sync)** — `src/services/etesync.ts:39-58`
   `ensureCollection` does list → create → upload without any uniqueness guarantee. If two fresh
