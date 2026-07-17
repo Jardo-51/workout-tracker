@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { broadcastSessionChanged, onSessionChanged } from '@/services/broadcast'
 import { getAllSessions, getSession as getStoredSession, putSession } from '@/services/db'
+import { errorMessage } from '@/utils/error'
 import { toDateKey } from '@/utils/format'
 
 function normalizeName (name: string): string {
@@ -30,6 +31,13 @@ export const useSessionsStore = defineStore('sessions', () => {
   const loaded = ref(false)
   /** Bumped on every user-driven mutation; the sync store watches it. */
   const mutationCount = ref(0)
+  /**
+   * Message of the last write that IndexedDB rejected, or '' once one
+   * succeeds. Every mutation updates the reactive copy before the write
+   * resolves, so a rejection leaves the UI showing data that is not on disk
+   * and will be gone after a reload — App.vue watches this and tells the user.
+   */
+  const storageError = ref('')
 
   let loadPromise: Promise<void> | undefined
 
@@ -51,9 +59,24 @@ export const useSessionsStore = defineStore('sessions', () => {
     return loadPromise
   }
 
-  /** Writes through to IndexedDB and lets other tabs know. */
+  /**
+   * Writes through to IndexedDB and lets other tabs know. A rejected write is
+   * recorded rather than rethrown: the mutations that call this are fired from
+   * click handlers that do not await them, so throwing would only produce an
+   * unhandled rejection. The in-memory copy is deliberately left as it is —
+   * the session may have been mutated again while the write was in flight, so
+   * there is no version it would be correct to roll back to.
+   */
   async function store (session: Session) {
-    await putSession(session)
+    try {
+      await putSession(session)
+    } catch (error) {
+      storageError.value = errorMessage(error)
+      return
+    }
+    storageError.value = ''
+    // Only after a successful write: peers react by re-reading the session
+    // from the DB, so announcing a write that never landed tells them nothing.
     broadcastSessionChanged(session.id)
   }
 
@@ -241,6 +264,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     sessions,
     loaded,
     mutationCount,
+    storageError,
     load,
     upsertFromRemote,
     visibleSessions,

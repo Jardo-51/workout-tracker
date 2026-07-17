@@ -7,14 +7,14 @@
     <v-row dense>
       <v-col
         v-for="(label, i) in labels"
-        :key="label"
+        :key="i"
         class="text-center"
         cols="3"
       >
         <v-btn
           block
           :disabled="valueAt(i) >= 9"
-          icon="mdi-plus"
+          icon="$plus"
           size="small"
           variant="tonal"
           @click="step(i, 1)"
@@ -25,7 +25,7 @@
         <v-btn
           block
           :disabled="valueAt(i) <= 0"
-          icon="mdi-minus"
+          icon="$minus"
           size="small"
           variant="tonal"
           @click="step(i, -1)"

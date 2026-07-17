@@ -9,7 +9,7 @@
     >
       <v-card-item>
         <template #prepend>
-          <v-icon icon="mdi-play-circle" size="large" />
+          <v-icon icon="$playCircle" size="large" />
         </template>
 
         <v-card-title>Resume workout</v-card-title>
@@ -26,7 +26,7 @@
       block
       class="mb-4"
       color="primary"
-      prepend-icon="mdi-plus"
+      prepend-icon="$plus"
       size="x-large"
       @click="startWorkout"
     >
@@ -53,7 +53,7 @@
 
             <template #append>
               <v-btn
-                icon="mdi-delete-outline"
+                icon="$deleteOutline"
                 variant="text"
                 @click.stop="confirmDelete(session)"
               />
@@ -67,7 +67,7 @@
       v-else-if="!store.activeSession"
       class="text-center text-medium-emphasis mt-16"
     >
-      <v-icon class="mb-4" icon="mdi-dumbbell" size="64" />
+      <v-icon class="mb-4" icon="$dumbbell" size="64" />
       <div class="text-h6">No workouts yet</div>
       <div class="text-body-2">Start your first one above</div>
     </div>

@@ -21,8 +21,15 @@ export default defineConfig({
         families: [
           {
             name: 'Roboto',
-            weights: [100, 300, 400, 500, 700, 900],
-            styles: ['normal', 'italic'],
+            // Every weight/style here is emitted once per unicode subset (8 of
+            // them) and precached in full by the service worker, so unused
+            // ones are not free. These three are what the app renders: 400 for
+            // body/caption/h5, 500 for h6/subtitle-2/buttons, 700 for
+            // font-weight-bold. Nothing uses italics or the thin/black
+            // weights. Subsets are left alone — dropping latin-ext would break
+            // accented exercise names.
+            weights: [400, 500, 700],
+            styles: ['normal'],
           },
         ],
       },
@@ -60,18 +67,6 @@ export default defineConfig({
         ],
       },
     }),
-    // unplugin-fonts scans CSS for @font-face and emits a `<link rel=preload>`
-    // for every src URL it finds. The mdi CSS imported in src/plugins/vuetify.ts
-    // declares 4 formats (eot/woff2/woff/ttf), so 4 preloads get emitted but
-    // only one is ever used — browsers warn about the unused ones. Strip them.
-    {
-      name: 'remove-mdi-font-preloads',
-      enforce: 'post',
-      transformIndexHtml: {
-        order: 'post',
-        handler: html => html.replace(/\s*<link[^>]+materialdesignicons[^>]+>/g, ''),
-      },
-    },
   ],
   define: { 'process.env': {} },
   resolve: {

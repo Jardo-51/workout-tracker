@@ -24,9 +24,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: Build
+      - name: Install
         run: |
           nix develop --command bash -c "
             pnpm install --frozen-lockfile
+          "
+
+      - name: Lint
+        run: |
+          nix develop --command bash -c "
+            pnpm lint
+          "
+
+      - name: Test
+        run: |
+          nix develop --command bash -c "
+            pnpm test
+          "
+
+      - name: Build
+        run: |
+          nix develop --command bash -c "
             pnpm build
           "

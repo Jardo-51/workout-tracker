@@ -6,12 +6,12 @@
   >
     <v-card>
       <v-toolbar color="primary">
-        <v-btn icon="mdi-close" @click="open = false" />
+        <v-btn icon="$close" @click="open = false" />
         <v-toolbar-title>{{ editEntry ? 'Edit exercise' : 'Add exercise' }}</v-toolbar-title>
 
         <v-btn
           v-if="trimmedName"
-          icon="mdi-history"
+          icon="$history"
           @click="emit('history', trimmedName)"
         />
       </v-toolbar>

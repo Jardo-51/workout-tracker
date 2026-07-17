@@ -10,7 +10,12 @@
 
 # connect-src allows any https/wss origin so the user-configured Etesync
 # sync server is reachable; everything else stays same-origin.
-Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; connect-src 'self' https: wss:; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self';"
+#
+# 'wasm-unsafe-eval' is required by libsodium (via etebase), which calls
+# WebAssembly.instantiate at startup: Chromium blocks that under a bare
+# script-src 'self'. It permits wasm compilation only — not eval() or inline
+# script — and is ignored by browsers that already allow wasm without it.
+Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; connect-src 'self' https: wss:; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self';"
 Header set X-Content-Type-Options "nosniff"
 Header set X-Frame-Options "DENY"
 

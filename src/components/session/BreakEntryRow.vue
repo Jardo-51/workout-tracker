@@ -5,7 +5,7 @@
     @click="emit('edit')"
   >
     <v-divider class="flex-grow-1" />
-    <v-icon icon="mdi-timer-sand" size="small" />
+    <v-icon icon="$timerSand" size="small" />
     <span class="text-body-2 text-no-wrap">Break — {{ formatDuration(entry.durationSec) }}</span>
     <v-divider class="flex-grow-1" />
   </div>

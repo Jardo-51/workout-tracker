@@ -23,13 +23,28 @@
   import { useAppStore } from '@/stores/app'
   import { useSessionsStore } from '@/stores/sessions'
   import { useSyncStore } from '@/stores/sync'
+  import { errorMessage } from '@/utils/error'
 
   const app = useAppStore()
   const theme = useTheme()
 
   const sessions = useSessionsStore()
   const sync = useSyncStore()
-  sessions.load().then(() => sync.init())
+
+  // Without the catch, an unavailable IndexedDB (private-browsing modes,
+  // storage pressure) renders an empty app with no explanation, and sync never
+  // starts because init() hangs off the same chain.
+  sessions.load()
+    .then(() => sync.init())
+    .catch((error: unknown) => {
+      app.showSnackbar(`Could not open local storage: ${errorMessage(error)}`, 'error')
+    })
+
+  watch(() => sessions.storageError, message => {
+    if (message) {
+      app.showSnackbar(`Could not save: ${message}`, 'error')
+    }
+  })
 
   watch(() => app.darkMode, dark => {
     theme.change(dark ? 'dark' : 'light')

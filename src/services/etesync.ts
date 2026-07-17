@@ -1,17 +1,21 @@
 import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import * as Etebase from 'etebase'
 import {
+  clearSyncState,
   getMeta,
   getSyncMeta,
   putSyncMeta,
   setMeta,
+  SYNC_META_PREFIX,
 } from '@/services/db'
 
 const COLLECTION_TYPE = 'workout-tracker.sessions'
 const ITEM_TYPE = 'workout-session'
 const BATCH_SIZE = 20
-const META_COLLECTION_CACHE = 'etesync.collectionCache'
-const META_STOKEN = 'etesync.stoken'
+// Built from the prefix so logout keeps clearing them: clearSyncState drops
+// exactly the `meta` keys that carry it.
+const META_COLLECTION_CACHE = `${SYNC_META_PREFIX}collectionCache`
+const META_STOKEN = `${SYNC_META_PREFIX}stoken`
 
 export type Account = Etebase.Account
 
@@ -36,22 +40,72 @@ export async function logout (account: Account): Promise<void> {
   }
 }
 
+/**
+ * Accounts whose cached collection has been confirmed against the server. The
+ * cache exists to keep a list request off every sync; checking it once is
+ * cheap next to the syncs themselves, and is what eventually pulls a device
+ * off a collection it lost the race for.
+ *
+ * Keyed by account rather than a plain flag because an account is built once
+ * per app start (the sync store restores one on its first sync), so a new one
+ * means the check is due again — including after a logout and a login as
+ * somebody else, where a stale answer would be the wrong account's.
+ */
+const collectionChecked = new WeakSet<Account>()
+
+/**
+ * The collection a device syncs into, chosen identically everywhere: the
+ * lowest uid among the non-deleted candidates. Which one wins does not matter,
+ * only that every device agrees — see `ensureCollection`.
+ */
+function pickCollection (candidates: Etebase.Collection[]): Etebase.Collection | undefined {
+  return candidates
+    .filter(candidate => !candidate.isDeleted)
+    .toSorted((a, b) => (a.uid < b.uid ? -1 : 1))[0]
+}
+
+/**
+ * Resolves the sessions collection, creating it on first use.
+ *
+ * `list` → `create` → `upload` has no uniqueness guarantee: two fresh devices
+ * logging in at the same time both see an empty list and each uploads its own
+ * collection. Nothing surfaces that, so without a tie-break the two would sync
+ * into separate collections and never converge. Hence: re-list after creating,
+ * and let every device agree on one winner via `pickCollection`. A collection
+ * that loses is only ever the empty one we just made, so abandoning it strands
+ * nothing.
+ *
+ * The re-list still races — a device can create, re-list before the other
+ * device's upload is visible, and cache a collection that later loses. So the
+ * cache is confirmed once per account too, and a device that finds itself on
+ * the loser drops its sync bookkeeping and re-pushes into the winner. That
+ * bookkeeping is what marks a session as already synced; keeping it would
+ * leave every session looking clean and silently strand them in the
+ * abandoned collection.
+ */
 async function ensureCollection (account: Account) {
   const collectionManager = account.getCollectionManager()
   const cached = await getMeta<Uint8Array>(META_COLLECTION_CACHE)
-  if (cached) {
+  if (cached && collectionChecked.has(account)) {
     return { collectionManager, collection: collectionManager.cacheLoad(cached) }
   }
 
-  const existing = await collectionManager.list(COLLECTION_TYPE)
-  let collection = existing.data[0]
+  let collection = pickCollection((await collectionManager.list(COLLECTION_TYPE)).data)
   if (!collection) {
-    collection = await collectionManager.create(
+    const created = await collectionManager.create(
       COLLECTION_TYPE,
       { name: 'Workout Tracker', mtime: Date.now() },
       '',
     )
-    await collectionManager.upload(collection)
+    await collectionManager.upload(created)
+    collection = pickCollection((await collectionManager.list(COLLECTION_TYPE)).data) ?? created
+  }
+  collectionChecked.add(account)
+
+  const cachedUid = cached ? collectionManager.cacheLoad(cached).uid : undefined
+  if (cachedUid && cachedUid !== collection.uid) {
+    console.warn('[sync] moving to collection', collection.uid, 'from', cachedUid)
+    await clearSyncState()
   }
   await setMeta(META_COLLECTION_CACHE, collectionManager.cacheSave(collection))
   return { collectionManager, collection }

@@ -68,68 +68,126 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## MEDIUM
 
-- [ ] **5. Etebase account session stored unencrypted in localStorage** — `src/stores/sync.ts:28,61`
+- [x] **5. Etebase account session stored unencrypted in localStorage** — `src/stores/sync.ts:28,61`
   `account.save()` output contains the account's symmetric key material; anything running in the
   page origin can lift it and decrypt the user's server-side data. The strict CSP in `.htaccess`
   lowers XSS risk considerably, but `Etebase.Account.save(encryptionKey)` supports wrapping the
   session with a key — consider storing the saved session in IndexedDB and/or documenting the
   trade-off. At minimum, be aware that "end-to-end encrypted" holds only as long as the device/
   browser profile is trusted.
+  — _Documented, in the README and at `LS_SESSION`; deliberately **not** "fixed", because both
+  suggested mitigations are theatre against the threat named. The threat is code running in this
+  origin. IndexedDB is the same origin. `Account.save(encryptionKey)` needs a key the app can
+  read unattended on every start, so it must live in the same origin too — an attacker who can
+  read localStorage can read the key and call decrypt. A non-extractable WebCrypto key raises the
+  bar only against a passive dump, not against anyone who runs code in the page, and costs a
+  migration to buy that. The one mitigation with teeth is deriving the key from a passphrase
+  typed at every app start, which trades away the open-and-log UX the app exists for — a product
+  call, not a code-review call. So the honest resolution is the finding's own "at minimum": say
+  plainly that being logged in means trusting the device, and that the encryption covers transit
+  and the server rather than the device._
 
-- [ ] **6. CSP may block libsodium's WebAssembly** — `public/.htaccess:13`
+- [x] **6. CSP may block libsodium's WebAssembly** — `public/.htaccess:13`
   `etebase` depends on libsodium, which compiles a wasm module at startup. Chromium requires
   `'wasm-unsafe-eval'` in `script-src` for `WebAssembly.instantiate`; with plain
   `script-src 'self'` libsodium either falls back to the much slower asm.js build or fails
   outright depending on version. Verify login/sync against the production server with this exact
   header; likely fix is `script-src 'self' 'wasm-unsafe-eval'`.
+  — _Confirmed the premise before fixing: etebase bundles libsodium-wrappers, and its dist calls
+  `WebAssembly.instantiate`/`instantiateStreaming`. Added `'wasm-unsafe-eval'` to `script-src`.
+  Not verified against the production server — the header only takes effect once deployed, so
+  that check is still worth doing on the next deploy._
 
-- [ ] **7. First-login race can create two collections (split-brain sync)** — `src/services/etesync.ts:39-58`
+- [x] **7. First-login race can create two collections (split-brain sync)** — `src/services/etesync.ts:39-58`
   `ensureCollection` does list → create → upload without any uniqueness guarantee. If two fresh
   devices log in around the same time, both see an empty list and each uploads its own
   `workout-tracker.sessions` collection. Afterwards `existing.data[0]` may resolve differently per
   device, so the two devices sync into different collections and never converge — with no error
   shown. Consider: after upload, re-list and prefer a deterministic winner (e.g. lowest uid),
   migrating items if the local cache points at the loser.
+  — _Took both halves. Re-lists after upload and every device picks the lowest uid, so the
+  winner is the same everywhere; a collection that loses is only ever the empty one just
+  created, so abandoning it strands nothing. The re-list alone does **not** close the race
+  though — a device can create, re-list before the other's upload is visible, and cache a
+  collection that later loses — so the cache is also confirmed against the server once per app
+  start, and a device on the loser drops its sync bookkeeping and re-pushes into the winner.
+  Dropping the bookkeeping is the load-bearing part of that migration: it is what marks a
+  session as synced, so keeping it would leave every session looking clean and strand them in
+  the abandoned collection. The extra cost is one list request per app start, not per sync._
 
-- [ ] **8. Duplicate `v-for` key in TempoInput** — `src/components/session/TempoInput.vue:9-11,46`
+- [x] **8. Duplicate `v-for` key in TempoInput** — `src/components/session/TempoInput.vue:9-11,46`
   `labels = ['Down', 'Hold', 'Up', 'Hold']` is rendered with `:key="label"`, so two columns share
   the key `"Hold"`. Vue logs a duplicate-key warning and keyed patching can mis-match nodes. Use
   `:key="i"` or give the labels distinct ids.
 
-- [ ] **9. IndexedDB failures are invisible and leave memory/DB diverged** — `src/App.vue:32`, `src/stores/sessions.ts:84-88`
+- [x] **9. IndexedDB failures are invisible and leave memory/DB diverged** — `src/App.vue:32`, `src/stores/sessions.ts:84-88`
   `sessions.load().then(() => sync.init())` has no `.catch` — if IDB is unavailable (e.g. some
   private-browsing modes, storage pressure), the app renders an empty state with no explanation
   and `sync.init()` never runs. Similarly, every mutation updates the reactive state *before*
   `putSession` resolves; if the write rejects (quota), the UI shows data that evaporates on
   reload, and the rejection surfaces only as an unhandled promise rejection. Add a top-level
   catch with a snackbar, and consider surfacing persist failures.
+  — _Both surfaced as error snackbars: the `load()` chain now has a `.catch`, and a rejected
+  write sets `storageError` on the sessions store, which App.vue watches. The write path also
+  no longer broadcasts to other tabs when the write failed — peers react by re-reading the
+  session, so announcing a write that never landed only wasted a read. Memory is deliberately
+  **not** rolled back to the stored version: mutations are fired from click handlers that never
+  await them, so by the time a rejection arrives the session may have been mutated again and
+  there is no version it would be correct to restore. The user is told the data is not saved;
+  reconciling it is not attempted._
 
-- [ ] **10. No automated tests for the sync engine** — project-wide
+- [x] **10. No automated tests for the sync engine** — project-wide
   `syncSessions`, the dirty-tracking via `syncedUpdatedAt`, tombstone propagation, and the stoken
   pagination are exactly the kind of subtle logic that regresses silently (findings 3, 4, 7 all
   live there). The logic is already well-factored for testing (`applyRemote` is injected; the db
   layer is a thin module easy to fake). A vitest suite with a faked item manager would cover the
   pull/push matrix cheaply. The Playwright `verify` skill covers the happy path only.
+  — _26 vitest cases in `src/services/etesync.test.ts`, against an in-memory item manager
+  (`etesync.fake.ts`) and db (`db.fake.ts`); `pnpm test`, and CI runs it. Covers the pull/push
+  matrix, batching, stoken pagination, tombstones, and one case per subtlety the earlier findings
+  turned up: skipping malformed items without wedging (#3), the tie-break and the `- 1` that
+  keeps a local winner dirty (#4), and collection convergence plus the migration off a losing
+  cache (#7). The suite was checked by mutation rather than by watching it go green: reverting
+  `pickCollection` to `data[0]`, making `decodeSession` rethrow, dropping the `- 1`, making
+  `compareSessions` give up on ties, and stopping pagination after one page each fail exactly the
+  tests that describe them. One production change came out of writing it — the once-per-app-start
+  collection check is keyed on the account rather than a module flag, which is both what a test
+  can simulate a restart with and more correct after a re-login as a different user._
 
-- [ ] **11. CI never runs the linter** — `.github/workflows/build.yml:27-32`
+- [x] **11. CI never runs the linter** — `.github/workflows/build.yml:27-32`
   `pnpm build` runs type-check + build, but `pnpm lint` is only ever run manually. Add it to the
   Build workflow so style/correctness rules (the repo has a full eslint-config-vuetify setup)
   actually gate pushes.
 
-- [ ] **12. Font payload: 12 Roboto variants + full icon font precached** — `vite.config.mts:19-33`
+- [x] **12. Font payload: 12 Roboto variants + full icon font precached** — `vite.config.mts:19-33`
   unplugin-fonts loads Roboto in 6 weights × 2 styles, and `@mdi/font` ships the entire
   Material Design Icons font (~400 KB woff2 alone); `globPatterns` includes `woff2`, so all of it
   lands in every user's service-worker precache on install and after each deploy. Vuetify
   typically needs weights 400/500/700, rarely italics; and `@mdi/js` (tree-shaken SVG paths, via
   `aliases`/`sets` in the Vuetify config) would eliminate the icon font entirely.
+  — _Understated, if anything: fontsource emits each variant once per unicode subset, and there
+  are 8 of those, so the 12 variants were **96** Roboto files. Measured precached woff2 went from
+  1795 KB (97 files) to 340 KB (24), and the CSS bundle from 704 KB to 272 KB. Took both
+  suggestions: weights cut to 400/500/700 normal (grepped the templates — that is exactly what
+  the app renders; nothing uses italics or thin/black), and `@mdi/js` via `aliases`/`sets` with
+  the app's 13 icons named in `plugins/vuetify.ts`. Subsets are deliberately left alone: dropping
+  latin-ext would break accented exercise names. Removing the icon font also made the
+  `remove-mdi-font-preloads` vite plugin dead code, so it is gone. Verified in a real browser —
+  every `.v-icon` resolves to a non-empty SVG path, no webfont is requested, no console errors._
 
-- [ ] **13. Logout during an in-flight sync resurrects sync bookkeeping** — `src/stores/sync.ts:67-84`
+- [x] **13. Logout during an in-flight sync resurrects sync bookkeeping** — `src/stores/sync.ts:67-84`
   `logout()` clears `syncMeta`/`meta` while a running `syncSessions` may still `putSyncMeta` /
   `setMeta` afterwards, leaving orphaned rows (stale collection cache, stoken, item caches) that a
   *future* login on a different account would then trust — `ensureCollection` would load a cached
   collection belonging to the old account and fail confusingly. Await/cancel the in-flight sync
   before clearing (e.g. keep the `syncNow` promise and `await` it in `logout`), or guard db writes
   with an epoch/generation check.
+  — _Took the await, not the epoch check: `syncNow` now keeps its run in `inFlightSync` and
+  `logout` waits on it. Ordering inside `logout` turned out to matter beyond what the finding
+  describes — a sync that *succeeds* mid-logout also re-stamps `lastSyncAt` and rewrites its
+  localStorage key, so only the saved session (which is what makes `configured` false and stops
+  new runs from starting) is dropped before the await; every other clear happens after it. The
+  single-flight guard moved out into `syncNow`, leaving the sync body as `runSync`._
 
 ## LOW
 
@@ -140,14 +198,19 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   — _Folded into finding #2: `load()` now caches its promise, which also keeps the new
   cross-tab subscription from registering twice._
 
-- [ ] **15. `getDB` caches a rejected promise forever** — `src/services/db.ts:33-47`
+- [x] **15. `getDB` caches a rejected promise forever** — `src/services/db.ts:33-47`
   If `openDB` rejects once, every later call reuses the rejected `dbPromise` until a full reload.
   Reset `dbPromise` on rejection.
+  — _Folded into finding #9: retrying the open is what makes the new error snackbar actionable,
+  since some causes (a blocking upgrade in another tab, storage pressure) clear on their own._
 
-- [ ] **16. `clearSyncState` wipes the generic `meta` store** — `src/services/db.ts:81-85`
+- [x] **16. `clearSyncState` wipes the generic `meta` store** — `src/services/db.ts:81-85`
   The store is named/typed as generic app metadata but logout clears it wholesale. Fine today
   (only etesync keys live there), a foot-gun the moment anything else is stored. Either rename the
   store `syncMeta2`/scope it, or delete only `etesync.*` keys.
+  — _Folded into finding #13, since both are about logout clearing more than it should. Deletes
+  only the `etesync.*` keys; the prefix is now exported as `SYNC_META_PREFIX` and the etesync
+  service builds its key names from it, so the two cannot drift apart._
 
 - [x] **17. Stepper minus button can't reach `min` when the value isn't step-aligned** — `src/components/session/StepperField.vue:4`
   Disable condition is `model - step < min`, so Weight = 1 kg with step 2.5 can never be

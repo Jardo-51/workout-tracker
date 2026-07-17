@@ -12,7 +12,7 @@
 
       <template #append>
         <v-btn
-          icon="mdi-history"
+          icon="$history"
           variant="text"
           @click.stop="emit('history')"
         />
