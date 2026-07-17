@@ -68,13 +68,24 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
 
 ## MEDIUM
 
-- [ ] **5. Etebase account session stored unencrypted in localStorage** — `src/stores/sync.ts:28,61`
+- [x] **5. Etebase account session stored unencrypted in localStorage** — `src/stores/sync.ts:28,61`
   `account.save()` output contains the account's symmetric key material; anything running in the
   page origin can lift it and decrypt the user's server-side data. The strict CSP in `.htaccess`
   lowers XSS risk considerably, but `Etebase.Account.save(encryptionKey)` supports wrapping the
   session with a key — consider storing the saved session in IndexedDB and/or documenting the
   trade-off. At minimum, be aware that "end-to-end encrypted" holds only as long as the device/
   browser profile is trusted.
+  — _Documented, in the README and at `LS_SESSION`; deliberately **not** "fixed", because both
+  suggested mitigations are theatre against the threat named. The threat is code running in this
+  origin. IndexedDB is the same origin. `Account.save(encryptionKey)` needs a key the app can
+  read unattended on every start, so it must live in the same origin too — an attacker who can
+  read localStorage can read the key and call decrypt. A non-extractable WebCrypto key raises the
+  bar only against a passive dump, not against anyone who runs code in the page, and costs a
+  migration to buy that. The one mitigation with teeth is deriving the key from a passphrase
+  typed at every app start, which trades away the open-and-log UX the app exists for — a product
+  call, not a code-review call. So the honest resolution is the finding's own "at minimum": say
+  plainly that being logged in means trusting the device, and that the encryption covers transit
+  and the server rather than the device._
 
 - [ ] **6. CSP may block libsodium's WebAssembly** — `public/.htaccess:13`
   `etebase` depends on libsodium, which compiles a wasm module at startup. Chromium requires

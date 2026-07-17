@@ -9,6 +9,17 @@ import { errorMessage } from '@/utils/error'
 /** Default server used by official Etesync 2.0 accounts. */
 export const DEFAULT_SERVER_URL = 'https://api.etebase.com/partner/etesync/'
 
+/**
+ * The saved Etebase session, which carries the account's key material: anything
+ * running in this origin can read it and decrypt the user's server-side data.
+ * The CSP is what keeps that from being reachable in practice.
+ *
+ * Moving it to IndexedDB, or wrapping it via `Account.save(encryptionKey)`,
+ * would not help — both the store and any wrapping key live in the same origin
+ * as an attacker who got this far. Only a passphrase typed on every app start
+ * would, and this app is built not to ask. See the README on what the sync
+ * encryption does and does not cover.
+ */
 const LS_SESSION = 'etesync.session'
 const LS_USERNAME = 'etesync.username'
 const LS_SERVER = 'etesync.serverUrl'
