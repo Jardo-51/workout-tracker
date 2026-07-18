@@ -43,7 +43,19 @@
             :key="session.id"
             @click="openSession(session.id)"
           >
-            <v-list-item-title>{{ formatDateKey(session.dateKey) }}</v-list-item-title>
+            <v-list-item-title>
+              {{ formatDateKey(session.dateKey) }}
+
+              <v-chip
+                v-if="!session.endTime"
+                class="ml-1"
+                color="primary"
+                label
+                size="x-small"
+              >
+                In progress
+              </v-chip>
+            </v-list-item-title>
 
             <v-list-item-subtitle>
               {{ formatTime(session.startTime) }}<template v-if="session.endTime">–{{ formatTime(session.endTime) }}</template>

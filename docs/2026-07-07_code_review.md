@@ -232,7 +232,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   `role="button"` without `tabindex="0"` and Enter/Space handlers means the note editor and break
   rows can't be operated by keyboard. Add both, or use a real `<button>`/`v-btn variant="text"`.
 
-- [ ] **21. Multiple unfinished sessions are indistinguishable** — `src/stores/sessions.ts:31-33`, `src/pages/HomePage.vue:110-112`
+- [x] **21. Multiple unfinished sessions are indistinguishable** — `src/stores/sessions.ts:31-33`, `src/pages/HomePage.vue:110-112`
   After a sync merge, several sessions can have `endTime === undefined`; `activeSession` picks the
   newest and the rest silently appear in "Previous sessions" looking finished. Consider marking
   open sessions in the list (e.g. "in progress") and offering finish from there.
