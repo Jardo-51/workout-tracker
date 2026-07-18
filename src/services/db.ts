@@ -1,13 +1,7 @@
 import type { Session } from '@/types/workout'
 import type { DBSchema, IDBPDatabase } from 'idb'
 import { openDB } from 'idb'
-
-/**
- * Prefix for the keys in the generic `meta` store that belong to the sync
- * service. `clearSyncState` removes exactly these, so anything stored under
- * another prefix survives a logout.
- */
-export const SYNC_META_PREFIX = 'etesync.'
+import { SYNC_META_PREFIX } from '@/services/db.constants'
 
 /** Etebase sync bookkeeping for one session. */
 export interface SessionSyncMeta {

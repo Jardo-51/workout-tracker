@@ -6,8 +6,8 @@ import {
   getSyncMeta,
   putSyncMeta,
   setMeta,
-  SYNC_META_PREFIX,
 } from '@/services/db'
+import { SYNC_META_PREFIX } from '@/services/db.constants'
 
 const COLLECTION_TYPE = 'workout-tracker.sessions'
 const ITEM_TYPE = 'workout-session'
