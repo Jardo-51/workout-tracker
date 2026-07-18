@@ -243,7 +243,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   `defaultTheme`. Related: the static `<meta name="theme-color" content="#1976D2">` in
   `index.html` doesn't match the dark theme UI chrome.
 
-- [ ] **23. Fixed action bar hard-codes the nav height and ignores iOS safe areas** — `src/pages/SessionPage.vue:239-246`
+- [x] **23. Fixed action bar hard-codes the nav height and ignores iOS safe areas** — `src/pages/SessionPage.vue:239-246`
   `bottom: 56px` mirrors `v-bottom-navigation`'s default height; in iOS standalone mode the home
   indicator overlaps the nav because nothing accounts for `env(safe-area-inset-bottom)`. Add
   `viewport-fit=cover` + safe-area padding, or use Vuetify layout so the offset is computed.
