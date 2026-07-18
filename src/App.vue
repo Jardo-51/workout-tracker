@@ -9,9 +9,16 @@
     <v-snackbar
       v-model="app.snackbar"
       :color="app.snackbarColor"
-      :timeout="3000"
+      :timeout="app.snackbarAction ? 6000 : 3000"
+      @update:model-value="onSnackbarToggle"
     >
       {{ app.snackbarText }}
+
+      <template v-if="app.snackbarAction" #actions>
+        <v-btn variant="text" @click="runSnackbarAction">
+          {{ app.snackbarAction.label }}
+        </v-btn>
+      </template>
     </v-snackbar>
   </v-app>
 </template>
@@ -40,6 +47,20 @@
       app.showSnackbar(`Could not open local storage: ${errorMessage(error)}`, 'error')
     })
 
+  function runSnackbarAction () {
+    app.snackbarAction?.handler()
+    app.snackbar = false
+  }
+
+  // Clear the action whenever the snackbar closes (action click, timeout, or
+  // swipe) so a stale handler closing over an old session id can't fire again
+  // if the snackbar is ever re-shown without going through showSnackbar.
+  function onSnackbarToggle (value: boolean) {
+    if (!value) {
+      app.snackbarAction = null
+    }
+  }
+
   watch(() => sessions.storageError, error => {
     if (error) {
       app.showSnackbar(`Could not save: ${error.message}`, 'error')
@@ -48,5 +69,10 @@
 
   watch(() => app.darkMode, dark => {
     theme.change(dark ? 'dark' : 'light')
+    // Keep the browser/PWA chrome colour matching the active theme instead of
+    // the hard-coded blue in index.html, which looked wrong in dark mode.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', String(theme.current.value.colors.background))
   }, { immediate: true })
 </script>

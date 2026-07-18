@@ -12,21 +12,27 @@
         <v-text-field
           v-model="server"
           autocapitalize="off"
+          autocomplete="url"
           density="comfortable"
           label="Server URL"
+          name="server"
         />
 
         <v-text-field
           v-model="username"
           autocapitalize="off"
+          autocomplete="username"
           density="comfortable"
           label="Username"
+          name="username"
         />
 
         <v-text-field
           v-model="password"
+          autocomplete="current-password"
           density="comfortable"
           label="Password"
+          name="password"
           type="password"
         />
 

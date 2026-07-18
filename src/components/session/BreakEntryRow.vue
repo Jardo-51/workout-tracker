@@ -2,7 +2,10 @@
   <div
     class="d-flex align-center justify-center ga-2 py-2 mb-2 text-medium-emphasis"
     role="button"
+    tabindex="0"
     @click="emit('edit')"
+    @keydown.enter.prevent="emit('edit')"
+    @keydown.space.prevent="emit('edit')"
   >
     <v-divider class="flex-grow-1" />
     <v-icon icon="$timerSand" size="small" />

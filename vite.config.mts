@@ -68,7 +68,14 @@ export default defineConfig({
       },
     }),
   ],
-  define: { 'process.env': {} },
+  build: {
+    // Declared browser floor. The code uses Array.prototype.toSorted/toReversed
+    // (ES2023 — the eslint config actively prefers them over sort/reverse), and
+    // these are the first versions that ship them. esbuild doesn't polyfill
+    // runtime methods, so this is a documented minimum rather than a transpile
+    // target: older browsers are unsupported by design. See the README.
+    target: ['chrome110', 'edge110', 'firefox115', 'safari16'],
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),

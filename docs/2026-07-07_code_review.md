@@ -222,63 +222,91 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   plain `parseFloat`, so typing `7,5` snaps the field to `7.5`. Cosmetic, but jarring for
   comma-locale users; apply the same normalization in both places.
 
-- [ ] **19. Exercise-name prefill can overwrite user-adjusted fields** — `src/components/session/WorkoutEntryDialog.vue:166-178`
+- [x] **19. Exercise-name prefill can overwrite user-adjusted fields** — `src/components/session/WorkoutEntryDialog.vue:166-178`
   `onNamePicked` re-applies the last entry's weight/reps/sets/tempo every time the combobox model
   changes to a known name. If the user picks a name, tweaks the weight, then edits the name text
   and re-commits it, their adjustments are silently reset. Only prefill when the name field was
   previously empty, or when values are still at their defaults.
 
-- [ ] **20. Clickable `div`s aren't keyboard-accessible** — `src/pages/SessionPage.vue:46-51`, `src/components/session/BreakEntryRow.vue:2-6`
+- [x] **20. Clickable `div`s aren't keyboard-accessible** — `src/pages/SessionPage.vue:46-51`, `src/components/session/BreakEntryRow.vue:2-6`
   `role="button"` without `tabindex="0"` and Enter/Space handlers means the note editor and break
   rows can't be operated by keyboard. Add both, or use a real `<button>`/`v-btn variant="text"`.
 
-- [ ] **21. Multiple unfinished sessions are indistinguishable** — `src/stores/sessions.ts:31-33`, `src/pages/HomePage.vue:110-112`
+- [x] **21. Multiple unfinished sessions are indistinguishable** — `src/stores/sessions.ts:31-33`, `src/pages/HomePage.vue:110-112`
   After a sync merge, several sessions can have `endTime === undefined`; `activeSession` picks the
   newest and the rest silently appear in "Previous sessions" looking finished. Consider marking
   open sessions in the list (e.g. "in progress") and offering finish from there.
 
-- [ ] **22. Light-theme flash on startup for dark-mode users** — `src/plugins/vuetify.ts:5-9`, `src/App.vue:34-36`
+- [x] **22. Light-theme flash on startup for dark-mode users** — `src/plugins/vuetify.ts:5-9`, `src/App.vue:34-36`
   Vuetify boots with `defaultTheme: 'light'` and the store's darkMode is applied via a watcher
   after mount. Read `localStorage.darkMode` directly in `vuetify.ts` when choosing
   `defaultTheme`. Related: the static `<meta name="theme-color" content="#1976D2">` in
   `index.html` doesn't match the dark theme UI chrome.
 
-- [ ] **23. Fixed action bar hard-codes the nav height and ignores iOS safe areas** — `src/pages/SessionPage.vue:239-246`
+- [x] **23. Fixed action bar hard-codes the nav height and ignores iOS safe areas** — `src/pages/SessionPage.vue:239-246`
   `bottom: 56px` mirrors `v-bottom-navigation`'s default height; in iOS standalone mode the home
   indicator overlaps the nav because nothing accounts for `env(safe-area-inset-bottom)`. Add
   `viewport-fit=cover` + safe-area padding, or use Vuetify layout so the offset is computed.
 
-- [ ] **24. README project structure and code comments are stale** — `README.md:37-48`, `src/types/workout.ts:34`
+- [x] **24. README project structure and code comments are stale** — `README.md:37-48`, `src/types/workout.ts:34`
   The structure block omits `services/`, `components/session/`, `utils/`, and the sessions/sync
   stores; `Session.updatedAt` is still documented as "used by the *future* sync layer". Also the
   intro's "account-free — your data stays on your device" deserves a "(unless you enable sync)"
   qualifier.
+  — _Rewrote the structure block (added `services/`, `components/session/`, `utils/`, `types/`,
+  `router/`, and the sessions/sync stores) and qualified the intro line. The `Session.updatedAt`
+  comment was already corrected by finding #4's work — it now points at `nextUpdatedAt`, with no
+  "future sync layer" language left — so only the README needed changing._
 
-- [ ] **25. `define: { 'process.env': {} }` is a legacy shim** — `vite.config.mts:76`
+- [x] **25. `define: { 'process.env': {} }` is a legacy shim** — `vite.config.mts:76`
   It blindly rewrites any `process.env` reference in dependencies to `{}` and can mask real env
   handling. If no dependency still needs it (it came from the template), drop it and see if the
   build still passes.
+  — _Nothing references `process.env` anywhere in `src/`, so the shim was dropped and
+  `vite build` still passes cleanly. Handled together with #26 as template build cruft._
 
-- [ ] **26. Unused dependencies** — `package.json:25,41`
+- [x] **26. Unused dependencies** — `package.json:25,41`
   Nothing imports `workbox-window` (vite-plugin-pwa's auto-injected registration doesn't need it),
   and `workbox-build` is bundled inside vite-plugin-pwa already. Remove both unless the versions
   are pinned intentionally for the plugin's peer resolution.
+  — _Removed both from `package.json` and regenerated `pnpm-lock.yaml`. They are non-optional
+  peerDependencies *and* regular dependencies of vite-plugin-pwa, so they stay in the tree as
+  transitive deps of the plugin (still resolved at the same `7.4.1`); dropping the top-level
+  entries only removes the redundant direct declarations. `pnpm install --frozen-lockfile` and
+  `vite build` both pass._
 
-- [ ] **27. Deploy rsync never deletes removed files** — `.github/workflows/deploy.yml:49-51`
+- [x] **27. Deploy rsync never deletes removed files** — `.github/workflows/deploy.yml:49-51`
   Without `--delete`, old hashed assets accumulate on the server forever. For a PWA that's partly
   a feature (long-offline clients can still fetch old chunks), but it should be a documented
   decision — otherwise add `--delete` plus a grace strategy.
+  — _Documented rather than changed. The finding names the reason `--delete` is risky here — a
+  client offline across a deploy still requests the old content-hashed chunk names from its cached
+  `index.html` until the service worker updates, and `--delete` would 404 them — so the omission
+  is deliberate. Added a comment on the rsync step spelling out the trade-off and that stale
+  assets get pruned manually._
 
-- [ ] **28. `toSorted`/`toReversed` set the browser floor at ~2023** — `src/stores/sessions.ts:28,38,49`
+- [x] **28. `toSorted`/`toReversed` set the browser floor at ~2023** — `src/stores/sessions.ts:28,38,49`
   These need Chrome 110 / Safari 16 / Firefox 115. Reasonable for a modern PWA, but there's no
   browserslist/build target declaring it, so an older phone gets a white screen instead of a
   graceful message. Either set `build.target` accordingly and document it, or use `[...x].sort()`.
+  — _Took the first option, not `[...x].sort()`: the repo's eslint config (`unicorn/no-array-sort`,
+  `no-array-reverse`) actively enforces `toSorted`/`toReversed`, so rewriting them fights the
+  linter and would have to be undone. Instead declared the floor explicitly — `build.target`
+  set to `chrome110/edge110/firefox115/safari16` in `vite.config.mts` (with a comment noting
+  esbuild doesn't polyfill these, so it's a documented minimum not a transpile fix) and a
+  "Browser Support" section in the README. Build still passes._
 
-- [ ] **29. Deleting a session irreversibly wipes its entries with no undo** — `src/stores/sessions.ts:146-154`
+- [x] **29. Deleting a session irreversibly wipes its entries with no undo** — `src/stores/sessions.ts:146-154`
   The tombstone keeps only the husk (`entries = []`), so the confirm dialog is the sole guard
   against fat-fingering away a whole workout. Keeping entries in the tombstone would enable an
   "Undo" snackbar and cost almost nothing (tombstones already sync).
+  — _Did exactly that. `deleteSession` no longer clears `entries`, a `restoreSession` flips the
+  tombstone back, and the delete snackbar now carries an "Undo" action. The snackbar gained an
+  optional action (label + handler) in the app store and an `#actions` slot in App.vue, with a
+  longer timeout (6 s) when one is present so there's time to hit it. Restoring undeletes the same
+  session id, so it re-appears with its entries intact; visibleSessions still filters tombstones,
+  so nothing leaks into the UI or history in the meantime._
 
-- [ ] **30. Login form lacks autocomplete hints** — `src/components/settings/EtesyncSettings.vue:19-31`
+- [x] **30. Login form lacks autocomplete hints** — `src/components/settings/EtesyncSettings.vue:19-31`
   Add `autocomplete="username"` / `autocomplete="current-password"` (and `name` attributes) so
   password managers behave, especially inside an installed PWA.

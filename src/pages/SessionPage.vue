@@ -47,7 +47,10 @@
         v-else
         class="text-body-2 text-medium-emphasis py-1"
         role="button"
+        tabindex="0"
         @click="startEditingNote"
+        @keydown.enter.prevent="startEditingNote"
+        @keydown.space.prevent="startEditingNote"
       >
         <v-icon icon="$noteEdit" size="small" />
         {{ session.note || 'Add a note…' }}
@@ -232,14 +235,16 @@
 
 <style scoped>
 .session-page {
-  /* Keep the last entries reachable above the fixed action bar. */
-  padding-bottom: 96px !important;
+  /* Keep the last entries reachable above the fixed action bar, plus the iOS
+     home-indicator inset the bar itself clears. */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
 }
 
 .action-bar {
   position: fixed;
   right: 0;
-  bottom: 56px; /* above the bottom navigation */
+  /* Above the bottom navigation, then above the home indicator on iOS. */
+  bottom: calc(56px + env(safe-area-inset-bottom));
   left: 0;
   background: rgb(var(--v-theme-surface));
   border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
