@@ -285,10 +285,16 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   is deliberate. Added a comment on the rsync step spelling out the trade-off and that stale
   assets get pruned manually._
 
-- [ ] **28. `toSorted`/`toReversed` set the browser floor at ~2023** — `src/stores/sessions.ts:28,38,49`
+- [x] **28. `toSorted`/`toReversed` set the browser floor at ~2023** — `src/stores/sessions.ts:28,38,49`
   These need Chrome 110 / Safari 16 / Firefox 115. Reasonable for a modern PWA, but there's no
   browserslist/build target declaring it, so an older phone gets a white screen instead of a
   graceful message. Either set `build.target` accordingly and document it, or use `[...x].sort()`.
+  — _Took the first option, not `[...x].sort()`: the repo's eslint config (`unicorn/no-array-sort`,
+  `no-array-reverse`) actively enforces `toSorted`/`toReversed`, so rewriting them fights the
+  linter and would have to be undone. Instead declared the floor explicitly — `build.target`
+  set to `chrome110/edge110/firefox115/safari16` in `vite.config.mts` (with a comment noting
+  esbuild doesn't polyfill these, so it's a documented minimum not a transpile fix) and a
+  "Browser Support" section in the README. Build still passes._
 
 - [ ] **29. Deleting a session irreversibly wipes its entries with no undo** — `src/stores/sessions.ts:146-154`
   The tombstone keeps only the husk (`entries = []`), so the confirm dialog is the sole guard

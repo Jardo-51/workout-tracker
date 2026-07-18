@@ -52,6 +52,13 @@ src/
 └── main.ts          # App entry point
 ```
 
+## Browser Support
+
+Targets modern evergreen browsers — **Chrome/Edge 110+, Firefox 115+, Safari 16+**
+(roughly 2023 onward). The app uses ES2023 array methods (`toSorted`/`toReversed`)
+that aren't polyfilled, so older browsers are unsupported by design; this floor is
+declared in `build.target` in `vite.config.mts`.
+
 ## PWA & Offline Support
 
 - Installable on mobile and desktop — runs as a standalone app
