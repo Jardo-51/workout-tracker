@@ -60,6 +60,21 @@ export const useSyncStore = defineStore('sync', () => {
     initialized = true
     watch(() => sessionsStore.mutationCount, () => requestSync())
     window.addEventListener('online', () => requestSync(0))
+    // Another tab logging out removes LS_SESSION, which fires a storage event
+    // *here* (storage never fires in the tab that made the change). Mirror the
+    // removal so this tab's savedSession goes null, configured turns false, and
+    // requestSync/syncNow stop starting runs. Without it, our next debounced
+    // sync would rewrite the etesync.* meta keys and lastSyncAt that the other
+    // tab's logout just cleared, resurrecting the old account — and a later
+    // login as a different account would then load that stale collection.
+    window.addEventListener('storage', event => {
+      if (event.key === LS_SESSION && event.newValue === null) {
+        savedSession.value = null
+        username.value = ''
+        serverUrl.value = ''
+        lastSyncAt.value = undefined
+      }
+    })
     if (configured.value) {
       syncNow()
     }
