@@ -237,7 +237,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   newest and the rest silently appear in "Previous sessions" looking finished. Consider marking
   open sessions in the list (e.g. "in progress") and offering finish from there.
 
-- [ ] **22. Light-theme flash on startup for dark-mode users** — `src/plugins/vuetify.ts:5-9`, `src/App.vue:34-36`
+- [x] **22. Light-theme flash on startup for dark-mode users** — `src/plugins/vuetify.ts:5-9`, `src/App.vue:34-36`
   Vuetify boots with `defaultTheme: 'light'` and the store's darkMode is applied via a watcher
   after mount. Read `localStorage.darkMode` directly in `vuetify.ts` when choosing
   `defaultTheme`. Related: the static `<meta name="theme-color" content="#1976D2">` in

@@ -39,6 +39,10 @@ const aliases = {
   timerSand: mdiTimerSand,
 }
 
+// Read the persisted preference (same key the app store uses) so a dark-mode
+// user doesn't get a white flash before App.vue's watcher runs after mount.
+const defaultTheme = localStorage.getItem('darkMode') === 'true' ? 'dark' : 'light'
+
 export default createVuetify({
   icons: {
     defaultSet: 'mdi',
@@ -46,6 +50,6 @@ export default createVuetify({
     sets: { mdi },
   },
   theme: {
-    defaultTheme: 'light',
+    defaultTheme,
   },
 })

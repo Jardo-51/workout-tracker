@@ -48,5 +48,10 @@
 
   watch(() => app.darkMode, dark => {
     theme.change(dark ? 'dark' : 'light')
+    // Keep the browser/PWA chrome colour matching the active theme instead of
+    // the hard-coded blue in index.html, which looked wrong in dark mode.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', String(theme.current.value.colors.background))
   }, { immediate: true })
 </script>
