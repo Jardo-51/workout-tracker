@@ -307,6 +307,6 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   session id, so it re-appears with its entries intact; visibleSessions still filters tombstones,
   so nothing leaks into the UI or history in the meantime._
 
-- [ ] **30. Login form lacks autocomplete hints** — `src/components/settings/EtesyncSettings.vue:19-31`
+- [x] **30. Login form lacks autocomplete hints** — `src/components/settings/EtesyncSettings.vue:19-31`
   Add `autocomplete="username"` / `autocomplete="current-password"` (and `name` attributes) so
   password managers behave, especially inside an installed PWA.
