@@ -228,7 +228,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   and re-commits it, their adjustments are silently reset. Only prefill when the name field was
   previously empty, or when values are still at their defaults.
 
-- [ ] **20. Clickable `div`s aren't keyboard-accessible** — `src/pages/SessionPage.vue:46-51`, `src/components/session/BreakEntryRow.vue:2-6`
+- [x] **20. Clickable `div`s aren't keyboard-accessible** — `src/pages/SessionPage.vue:46-51`, `src/components/session/BreakEntryRow.vue:2-6`
   `role="button"` without `tabindex="0"` and Enter/Space handlers means the note editor and break
   rows can't be operated by keyboard. Add both, or use a real `<button>`/`v-btn variant="text"`.
 

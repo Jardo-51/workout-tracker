@@ -47,7 +47,10 @@
         v-else
         class="text-body-2 text-medium-emphasis py-1"
         role="button"
+        tabindex="0"
         @click="startEditingNote"
+        @keydown.enter.prevent="startEditingNote"
+        @keydown.space.prevent="startEditingNote"
       >
         <v-icon icon="$noteEdit" size="small" />
         {{ session.note || 'Add a note…' }}
