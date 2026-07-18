@@ -222,7 +222,7 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   plain `parseFloat`, so typing `7,5` snaps the field to `7.5`. Cosmetic, but jarring for
   comma-locale users; apply the same normalization in both places.
 
-- [ ] **19. Exercise-name prefill can overwrite user-adjusted fields** — `src/components/session/WorkoutEntryDialog.vue:166-178`
+- [x] **19. Exercise-name prefill can overwrite user-adjusted fields** — `src/components/session/WorkoutEntryDialog.vue:166-178`
   `onNamePicked` re-applies the last entry's weight/reps/sets/tempo every time the combobox model
   changes to a known name. If the user picks a name, tweaks the weight, then edits the name text
   and re-commits it, their adjustments are silently reset. Only prefill when the name field was

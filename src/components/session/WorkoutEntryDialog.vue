@@ -137,6 +137,25 @@
   const repsInvalid = ref(false)
   const setsInvalid = ref(false)
 
+  // True once the user has adjusted any value field, so name-based prefill
+  // doesn't silently overwrite their edits. Writes made by the dialog itself
+  // (reset on open, prefill) go through applyValues and don't set it.
+  const dirty = ref(false)
+  let applyingValues = false
+
+  watch([weight, weightUnit, reps, sets, tempo], () => {
+    if (!applyingValues) {
+      dirty.value = true
+    }
+  }, { deep: true, flush: 'sync' })
+
+  function applyValues (fn: () => void) {
+    applyingValues = true
+    fn()
+    applyingValues = false
+    dirty.value = false
+  }
+
   const weightStep = computed(() => weightUnit.value === 'kg' ? 2.5 : 5)
 
   const trimmedName = computed(() => name.value?.trim() ?? '')
@@ -159,34 +178,38 @@
     weightInvalid.value = false
     repsInvalid.value = false
     setsInvalid.value = false
-    if (props.editEntry) {
-      name.value = props.editEntry.name
-      weight.value = props.editEntry.weight
-      weightUnit.value = props.editEntry.weightUnit
-      reps.value = props.editEntry.reps
-      sets.value = props.editEntry.sets
-      tempo.value = [...props.editEntry.tempo]
-    } else {
-      name.value = ''
-      weight.value = 0
-      weightUnit.value = app.weightUnit
-      reps.value = 8
-      sets.value = 3
-      tempo.value = [2, 0, 2, 0]
-    }
+    applyValues(() => {
+      if (props.editEntry) {
+        name.value = props.editEntry.name
+        weight.value = props.editEntry.weight
+        weightUnit.value = props.editEntry.weightUnit
+        reps.value = props.editEntry.reps
+        sets.value = props.editEntry.sets
+        tempo.value = [...props.editEntry.tempo]
+      } else {
+        name.value = ''
+        weight.value = 0
+        weightUnit.value = app.weightUnit
+        reps.value = 8
+        sets.value = 3
+        tempo.value = [2, 0, 2, 0]
+      }
+    })
   })
 
   function onNamePicked (value: string | null) {
-    if (props.editEntry || !value) {
+    if (props.editEntry || !value || dirty.value) {
       return
     }
     const last = store.lastWorkoutEntry(value)
     if (last) {
-      weight.value = last.weight
-      weightUnit.value = last.weightUnit
-      reps.value = last.reps
-      sets.value = last.sets
-      tempo.value = [...last.tempo]
+      applyValues(() => {
+        weight.value = last.weight
+        weightUnit.value = last.weightUnit
+        reps.value = last.reps
+        sets.value = last.sets
+        tempo.value = [...last.tempo]
+      })
     }
   }
 
