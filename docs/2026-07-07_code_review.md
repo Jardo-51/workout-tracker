@@ -275,10 +275,15 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   entries only removes the redundant direct declarations. `pnpm install --frozen-lockfile` and
   `vite build` both pass._
 
-- [ ] **27. Deploy rsync never deletes removed files** — `.github/workflows/deploy.yml:49-51`
+- [x] **27. Deploy rsync never deletes removed files** — `.github/workflows/deploy.yml:49-51`
   Without `--delete`, old hashed assets accumulate on the server forever. For a PWA that's partly
   a feature (long-offline clients can still fetch old chunks), but it should be a documented
   decision — otherwise add `--delete` plus a grace strategy.
+  — _Documented rather than changed. The finding names the reason `--delete` is risky here — a
+  client offline across a deploy still requests the old content-hashed chunk names from its cached
+  `index.html` until the service worker updates, and `--delete` would 404 them — so the omission
+  is deliberate. Added a comment on the rsync step spelling out the trade-off and that stale
+  assets get pruned manually._
 
 - [ ] **28. `toSorted`/`toReversed` set the browser floor at ~2023** — `src/stores/sessions.ts:28,38,49`
   These need Chrome 110 / Safari 16 / Firefox 115. Reasonable for a modern PWA, but there's no

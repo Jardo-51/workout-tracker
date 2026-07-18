@@ -47,5 +47,10 @@ jobs:
           echo "${{ secrets.DEPLOY_HOST_KEY }}" >> ~/.ssh/known_hosts
 
       - name: Deploy via rsync
+        # No --delete on purpose: assets are content-hashed, and a client that
+        # was offline across a deploy still requests the old chunk names from
+        # its cached index.html until the service worker updates. Leaving stale
+        # hashed assets in place keeps those clients working; the trade-off is
+        # that old files accumulate on the server and must be pruned manually.
         run: |
           rsync -crvz ./dist/ ${{ secrets.DEPLOY_URL }}
