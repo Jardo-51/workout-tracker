@@ -9,9 +9,15 @@
     <v-snackbar
       v-model="app.snackbar"
       :color="app.snackbarColor"
-      :timeout="3000"
+      :timeout="app.snackbarAction ? 6000 : 3000"
     >
       {{ app.snackbarText }}
+
+      <template v-if="app.snackbarAction" #actions>
+        <v-btn variant="text" @click="runSnackbarAction">
+          {{ app.snackbarAction.label }}
+        </v-btn>
+      </template>
     </v-snackbar>
   </v-app>
 </template>
@@ -39,6 +45,11 @@
     .catch((error: unknown) => {
       app.showSnackbar(`Could not open local storage: ${errorMessage(error)}`, 'error')
     })
+
+  function runSnackbarAction () {
+    app.snackbarAction?.handler()
+    app.snackbar = false
+  }
 
   watch(() => sessions.storageError, error => {
     if (error) {

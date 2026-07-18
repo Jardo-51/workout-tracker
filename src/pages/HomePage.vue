@@ -143,8 +143,12 @@
 
   async function doDelete () {
     if (sessionToDelete.value) {
-      await store.deleteSession(sessionToDelete.value.id)
-      app.showSnackbar('Session deleted')
+      const { id } = sessionToDelete.value
+      await store.deleteSession(id)
+      app.showSnackbar('Session deleted', 'success', {
+        label: 'Undo',
+        handler: () => void store.restoreSession(id),
+      })
     }
     deleteDialog.value = false
   }

@@ -296,10 +296,16 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   esbuild doesn't polyfill these, so it's a documented minimum not a transpile fix) and a
   "Browser Support" section in the README. Build still passes._
 
-- [ ] **29. Deleting a session irreversibly wipes its entries with no undo** — `src/stores/sessions.ts:146-154`
+- [x] **29. Deleting a session irreversibly wipes its entries with no undo** — `src/stores/sessions.ts:146-154`
   The tombstone keeps only the husk (`entries = []`), so the confirm dialog is the sole guard
   against fat-fingering away a whole workout. Keeping entries in the tombstone would enable an
   "Undo" snackbar and cost almost nothing (tombstones already sync).
+  — _Did exactly that. `deleteSession` no longer clears `entries`, a `restoreSession` flips the
+  tombstone back, and the delete snackbar now carries an "Undo" action. The snackbar gained an
+  optional action (label + handler) in the app store and an `#actions` slot in App.vue, with a
+  longer timeout (6 s) when one is present so there's time to hit it. Restoring undeletes the same
+  session id, so it re-appears with its entries intact; visibleSessions still filters tombstones,
+  so nothing leaks into the UI or history in the meantime._
 
 - [ ] **30. Login form lacks autocomplete hints** — `src/components/settings/EtesyncSettings.vue:19-31`
   Add `autocomplete="username"` / `autocomplete="current-password"` (and `name` attributes) so

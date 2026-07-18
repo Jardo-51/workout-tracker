@@ -227,7 +227,18 @@ export const useSessionsStore = defineStore('sessions', () => {
       return
     }
     session.deleted = true
-    session.entries = []
+    // Entries are kept on the tombstone (they already sync) so a delete can be
+    // undone from a snackbar; visibleSessions filters deleted ones out anyway.
+    await persist(session)
+  }
+
+  async function restoreSession (id: string) {
+    // getSession hides tombstones, so look the session up directly.
+    const session = sessions.value.find(s => s.id === id)
+    if (!session) {
+      return
+    }
+    session.deleted = false
     await persist(session)
   }
 
@@ -280,6 +291,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     reopenSession,
     updateSessionNote,
     deleteSession,
+    restoreSession,
     addEntry,
     updateEntry,
     removeEntry,
