@@ -1,6 +1,6 @@
 # Workout Tracker
 
-A Vue 3 PWA for tracking your workouts. Installable, offline-capable, and account-free — your data stays on your device.
+A Vue 3 PWA for tracking your workouts. Installable, offline-capable, and account-free — your data stays on your device (unless you enable Etesync sync).
 
 ## Tech Stack
 
@@ -41,9 +41,14 @@ src/
 ├── pages/           # Route-level page components
 ├── components/
 │   ├── layout/      # Bottom navigation
-│   └── settings/    # Theme toggle
-├── stores/          # Pinia stores (app: snackbar, dark mode)
+│   ├── session/     # Workout/break entry editors, history, steppers
+│   └── settings/    # Theme toggle, weight unit, Etesync sync
+├── services/        # IndexedDB, Etesync sync engine, cross-tab broadcast
+├── stores/          # Pinia stores (app, sessions, sync)
+├── utils/           # Formatting and error helpers
+├── types/           # Shared TypeScript types
 ├── plugins/         # Vuetify, Pinia, Router config
+├── router/          # Route definitions
 └── main.ts          # App entry point
 ```
 

@@ -248,11 +248,15 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   indicator overlaps the nav because nothing accounts for `env(safe-area-inset-bottom)`. Add
   `viewport-fit=cover` + safe-area padding, or use Vuetify layout so the offset is computed.
 
-- [ ] **24. README project structure and code comments are stale** — `README.md:37-48`, `src/types/workout.ts:34`
+- [x] **24. README project structure and code comments are stale** — `README.md:37-48`, `src/types/workout.ts:34`
   The structure block omits `services/`, `components/session/`, `utils/`, and the sessions/sync
   stores; `Session.updatedAt` is still documented as "used by the *future* sync layer". Also the
   intro's "account-free — your data stays on your device" deserves a "(unless you enable sync)"
   qualifier.
+  — _Rewrote the structure block (added `services/`, `components/session/`, `utils/`, `types/`,
+  `router/`, and the sessions/sync stores) and qualified the intro line. The `Session.updatedAt`
+  comment was already corrected by finding #4's work — it now points at `nextUpdatedAt`, with no
+  "future sync layer" language left — so only the README needed changing._
 
 - [ ] **25. `define: { 'process.env': {} }` is a legacy shim** — `vite.config.mts:76`
   It blindly rewrites any `process.env` reference in dependencies to `{}` and can mask real env
