@@ -10,6 +10,7 @@
       v-model="app.snackbar"
       :color="app.snackbarColor"
       :timeout="app.snackbarAction ? 6000 : 3000"
+      @update:model-value="onSnackbarToggle"
     >
       {{ app.snackbarText }}
 
@@ -49,6 +50,15 @@
   function runSnackbarAction () {
     app.snackbarAction?.handler()
     app.snackbar = false
+  }
+
+  // Clear the action whenever the snackbar closes (action click, timeout, or
+  // swipe) so a stale handler closing over an old session id can't fire again
+  // if the snackbar is ever re-shown without going through showSnackbar.
+  function onSnackbarToggle (value: boolean) {
+    if (!value) {
+      app.snackbarAction = null
+    }
   }
 
   watch(() => sessions.storageError, error => {
