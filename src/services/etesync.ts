@@ -100,7 +100,6 @@ async function ensureCollection (account: Account) {
     await collectionManager.upload(created)
     collection = pickCollection((await collectionManager.list(COLLECTION_TYPE)).data) ?? created
   }
-  collectionChecked.add(account)
 
   const cachedUid = cached ? collectionManager.cacheLoad(cached).uid : undefined
   if (cachedUid && cachedUid !== collection.uid) {
@@ -108,6 +107,11 @@ async function ensureCollection (account: Account) {
     await clearSyncState()
   }
   await setMeta(META_COLLECTION_CACHE, collectionManager.cacheSave(collection))
+  // Marked checked only once the migration and cache write have landed. If
+  // either rejects (a transient IndexedDB failure getDB leaves retryable), the
+  // account stays unchecked so the next sync retries the check instead of
+  // short-circuiting into a losing collection until the next app restart.
+  collectionChecked.add(account)
   return { collectionManager, collection }
 }
 
