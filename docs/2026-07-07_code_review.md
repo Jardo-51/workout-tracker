@@ -258,15 +258,22 @@ Each finding has a number for referencing and a checkbox to tick once addressed.
   comment was already corrected by finding #4's work — it now points at `nextUpdatedAt`, with no
   "future sync layer" language left — so only the README needed changing._
 
-- [ ] **25. `define: { 'process.env': {} }` is a legacy shim** — `vite.config.mts:76`
+- [x] **25. `define: { 'process.env': {} }` is a legacy shim** — `vite.config.mts:76`
   It blindly rewrites any `process.env` reference in dependencies to `{}` and can mask real env
   handling. If no dependency still needs it (it came from the template), drop it and see if the
   build still passes.
+  — _Nothing references `process.env` anywhere in `src/`, so the shim was dropped and
+  `vite build` still passes cleanly. Handled together with #26 as template build cruft._
 
-- [ ] **26. Unused dependencies** — `package.json:25,41`
+- [x] **26. Unused dependencies** — `package.json:25,41`
   Nothing imports `workbox-window` (vite-plugin-pwa's auto-injected registration doesn't need it),
   and `workbox-build` is bundled inside vite-plugin-pwa already. Remove both unless the versions
   are pinned intentionally for the plugin's peer resolution.
+  — _Removed both from `package.json` and regenerated `pnpm-lock.yaml`. They are non-optional
+  peerDependencies *and* regular dependencies of vite-plugin-pwa, so they stay in the tree as
+  transitive deps of the plugin (still resolved at the same `7.4.1`); dropping the top-level
+  entries only removes the redundant direct declarations. `pnpm install --frozen-lockfile` and
+  `vite build` both pass._
 
 - [ ] **27. Deploy rsync never deletes removed files** — `.github/workflows/deploy.yml:49-51`
   Without `--delete`, old hashed assets accumulate on the server forever. For a PWA that's partly
