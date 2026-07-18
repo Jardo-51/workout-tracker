@@ -163,7 +163,17 @@ export const useSyncStore = defineStore('sync', () => {
   async function runSync (): Promise<boolean> {
     try {
       const api = await etesync()
-      account ??= await api.restoreAccount(savedSession.value!)
+      if (!account) {
+        const restored = await api.restoreAccount(savedSession.value!)
+        // logout() can null savedSession while we await the restore above. Bail
+        // rather than resurrecting the module-level account it just cleared:
+        // that account would keep syncing the logged-out session, and logout —
+        // having seen `account` as undefined — never called api.logout on it.
+        if (!configured.value) {
+          return false
+        }
+        account = restored
+      }
       const account_ = account
       const ran = await withSyncLock(() =>
         api.syncSessions(account_, sessionsStore.sessions, sessionsStore.upsertFromRemote),
