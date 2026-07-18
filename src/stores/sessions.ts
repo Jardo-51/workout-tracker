@@ -235,10 +235,12 @@ export const useSessionsStore = defineStore('sessions', () => {
   async function restoreSession (id: string) {
     // getSession hides tombstones, so look the session up directly.
     const session = sessions.value.find(s => s.id === id)
-    if (!session) {
+    if (!session || !session.deleted) {
       return
     }
-    session.deleted = false
+    // Remove the flag entirely so a restored session is shape-identical to one
+    // that was never deleted (rather than carrying "deleted":false forever).
+    delete session.deleted
     await persist(session)
   }
 
