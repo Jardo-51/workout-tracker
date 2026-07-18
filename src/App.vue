@@ -40,9 +40,9 @@
       app.showSnackbar(`Could not open local storage: ${errorMessage(error)}`, 'error')
     })
 
-  watch(() => sessions.storageError, message => {
-    if (message) {
-      app.showSnackbar(`Could not save: ${message}`, 'error')
+  watch(() => sessions.storageError, error => {
+    if (error) {
+      app.showSnackbar(`Could not save: ${error.message}`, 'error')
     }
   })
 

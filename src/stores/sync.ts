@@ -60,6 +60,21 @@ export const useSyncStore = defineStore('sync', () => {
     initialized = true
     watch(() => sessionsStore.mutationCount, () => requestSync())
     window.addEventListener('online', () => requestSync(0))
+    // Another tab logging out removes LS_SESSION, which fires a storage event
+    // *here* (storage never fires in the tab that made the change). Mirror the
+    // removal so this tab's savedSession goes null, configured turns false, and
+    // requestSync/syncNow stop starting runs. Without it, our next debounced
+    // sync would rewrite the etesync.* meta keys and lastSyncAt that the other
+    // tab's logout just cleared, resurrecting the old account — and a later
+    // login as a different account would then load that stale collection.
+    window.addEventListener('storage', event => {
+      if (event.key === LS_SESSION && event.newValue === null) {
+        savedSession.value = null
+        username.value = ''
+        serverUrl.value = ''
+        lastSyncAt.value = undefined
+      }
+    })
     if (configured.value) {
       syncNow()
     }
@@ -148,7 +163,17 @@ export const useSyncStore = defineStore('sync', () => {
   async function runSync (): Promise<boolean> {
     try {
       const api = await etesync()
-      account ??= await api.restoreAccount(savedSession.value!)
+      if (!account) {
+        const restored = await api.restoreAccount(savedSession.value!)
+        // logout() can null savedSession while we await the restore above. Bail
+        // rather than resurrecting the module-level account it just cleared:
+        // that account would keep syncing the logged-out session, and logout —
+        // having seen `account` as undefined — never called api.logout on it.
+        if (!configured.value) {
+          return false
+        }
+        account = restored
+      }
       const account_ = account
       const ran = await withSyncLock(() =>
         api.syncSessions(account_, sessionsStore.sessions, sessionsStore.upsertFromRemote),

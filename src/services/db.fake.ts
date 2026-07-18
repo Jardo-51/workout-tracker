@@ -1,4 +1,5 @@
 import type { SessionSyncMeta } from '@/services/db'
+import { SYNC_META_PREFIX } from '@/services/db.constants'
 
 /**
  * In-memory stand-in for the IndexedDB layer, for `etesync.test.ts`. Only the
@@ -6,7 +7,6 @@ import type { SessionSyncMeta } from '@/services/db'
  * of it, since the sync engine only ever touches those through the injected
  * `applyRemote`.
  */
-export const SYNC_META_PREFIX = 'etesync.'
 
 const meta = new Map<string, unknown>()
 const syncMeta = new Map<string, SessionSyncMeta>()

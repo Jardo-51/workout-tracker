@@ -32,12 +32,14 @@ export const useSessionsStore = defineStore('sessions', () => {
   /** Bumped on every user-driven mutation; the sync store watches it. */
   const mutationCount = ref(0)
   /**
-   * Message of the last write that IndexedDB rejected, or '' once one
-   * succeeds. Every mutation updates the reactive copy before the write
-   * resolves, so a rejection leaves the UI showing data that is not on disk
-   * and will be gone after a reload — App.vue watches this and tells the user.
+   * The last write IndexedDB rejected, or null once one succeeds. Every
+   * mutation updates the reactive copy before the write resolves, so a
+   * rejection leaves the UI showing data that is not on disk and will be gone
+   * after a reload — App.vue watches this and tells the user. `at` makes each
+   * failure a distinct object so the watcher fires again even when the message
+   * repeats, as quota exhaustion does for every write in the session.
    */
-  const storageError = ref('')
+  const storageError = ref<{ message: string, at: number } | null>(null)
 
   let loadPromise: Promise<void> | undefined
 
@@ -71,10 +73,10 @@ export const useSessionsStore = defineStore('sessions', () => {
     try {
       await putSession(session)
     } catch (error) {
-      storageError.value = errorMessage(error)
+      storageError.value = { message: errorMessage(error), at: Date.now() }
       return
     }
-    storageError.value = ''
+    storageError.value = null
     // Only after a successful write: peers react by re-reading the session
     // from the DB, so announcing a write that never landed tells them nothing.
     broadcastSessionChanged(session.id)
