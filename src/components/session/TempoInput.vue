@@ -52,6 +52,7 @@
 <script lang="ts" setup>
   import type { Tempo } from '@/types/workout'
   import { computed } from 'vue'
+  import { DEFAULT_TEMPO } from '@/types/workout'
   import { formatTempo } from '@/utils/format'
 
   const tempo = defineModel<Tempo | undefined>({ required: true })
@@ -60,7 +61,7 @@
 
   // Kept while "without tempo" is checked, so unchecking brings back what the
   // user had rather than the default.
-  let lastTempo: Tempo = [2, 0, 2, 0]
+  let lastTempo: Tempo = DEFAULT_TEMPO
 
   const withoutTempo = computed({
     get: () => !tempo.value,

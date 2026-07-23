@@ -108,6 +108,7 @@
   import TempoInput from '@/components/session/TempoInput.vue'
   import { useAppStore } from '@/stores/app'
   import { useSessionsStore } from '@/stores/sessions'
+  import { DEFAULT_TEMPO } from '@/types/workout'
 
   const props = defineProps<{
     /** When set, the dialog edits this entry instead of adding a new one. */
@@ -130,7 +131,7 @@
   const weightUnit = ref<WeightUnit>('kg')
   const reps = ref(8)
   const sets = ref(3)
-  const tempo = ref<Tempo | undefined>([2, 0, 2, 0])
+  const tempo = ref<Tempo | undefined>([...DEFAULT_TEMPO])
   const confirmDelete = ref(false)
 
   const weightInvalid = ref(false)
@@ -192,7 +193,7 @@
         weightUnit.value = app.weightUnit
         reps.value = 8
         sets.value = 3
-        tempo.value = [2, 0, 2, 0]
+        tempo.value = [...DEFAULT_TEMPO]
       }
     })
   })
