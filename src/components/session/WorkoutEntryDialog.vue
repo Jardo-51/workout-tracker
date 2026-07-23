@@ -108,6 +108,7 @@
   import TempoInput from '@/components/session/TempoInput.vue'
   import { useAppStore } from '@/stores/app'
   import { useSessionsStore } from '@/stores/sessions'
+  import { DEFAULT_TEMPO } from '@/types/workout'
 
   const props = defineProps<{
     /** When set, the dialog edits this entry instead of adding a new one. */
@@ -130,7 +131,7 @@
   const weightUnit = ref<WeightUnit>('kg')
   const reps = ref(8)
   const sets = ref(3)
-  const tempo = ref<Tempo>([2, 0, 2, 0])
+  const tempo = ref<Tempo | undefined>([...DEFAULT_TEMPO])
   const confirmDelete = ref(false)
 
   const weightInvalid = ref(false)
@@ -185,14 +186,14 @@
         weightUnit.value = props.editEntry.weightUnit
         reps.value = props.editEntry.reps
         sets.value = props.editEntry.sets
-        tempo.value = [...props.editEntry.tempo]
+        tempo.value = props.editEntry.tempo ? [...props.editEntry.tempo] : undefined
       } else {
         name.value = ''
         weight.value = 0
         weightUnit.value = app.weightUnit
         reps.value = 8
         sets.value = 3
-        tempo.value = [2, 0, 2, 0]
+        tempo.value = [...DEFAULT_TEMPO]
       }
     })
   })
@@ -208,7 +209,7 @@
         weightUnit.value = last.weightUnit
         reps.value = last.reps
         sets.value = last.sets
-        tempo.value = [...last.tempo]
+        tempo.value = last.tempo ? [...last.tempo] : undefined
       })
     }
   }
@@ -222,7 +223,9 @@
       id: props.editEntry?.id ?? crypto.randomUUID(),
       kind: 'workout',
       name: trimmedName.value,
-      tempo: [...tempo.value],
+      // Omit the key entirely rather than storing `tempo: undefined`, so a
+      // locally-saved entry is shape-identical to one that came back from sync.
+      ...(tempo.value ? { tempo: [...tempo.value] as Tempo } : {}),
       reps: reps.value,
       weight: weight.value,
       weightUnit: weightUnit.value,

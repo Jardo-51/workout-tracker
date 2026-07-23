@@ -3,11 +3,15 @@ export type WeightUnit = 'kg' | 'lbs'
 /** Seconds for each phase: eccentric, pause, concentric, pause. */
 export type Tempo = [number, number, number, number]
 
+/** Starting point for a new exercise, and what "without tempo" reverts to. */
+export const DEFAULT_TEMPO: Tempo = [2, 0, 2, 0]
+
 export interface WorkoutEntry {
   id: string
   kind: 'workout'
   name: string
-  tempo: Tempo
+  /** Omitted when the exercise is done without a prescribed tempo. */
+  tempo?: Tempo
   reps: number
   weight: number
   weightUnit: WeightUnit
