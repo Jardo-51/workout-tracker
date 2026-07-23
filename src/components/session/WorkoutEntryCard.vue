@@ -7,7 +7,7 @@
 
       <v-card-subtitle>
         {{ entry.weight }} {{ entry.weightUnit }} × {{ entry.reps }} reps × {{ entry.sets }} sets
-        · tempo {{ formatTempo(entry.tempo) }}
+        <template v-if="entry.tempo">· tempo {{ formatTempo(entry.tempo) }}</template>
       </v-card-subtitle>
 
       <template #append>

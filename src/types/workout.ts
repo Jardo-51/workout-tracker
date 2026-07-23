@@ -7,7 +7,8 @@ export interface WorkoutEntry {
   id: string
   kind: 'workout'
   name: string
-  tempo: Tempo
+  /** Omitted when the exercise is done without a prescribed tempo. */
+  tempo?: Tempo
   reps: number
   weight: number
   weightUnit: WeightUnit

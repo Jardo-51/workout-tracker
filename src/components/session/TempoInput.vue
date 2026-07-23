@@ -1,10 +1,22 @@
 <template>
   <div>
-    <div class="text-caption text-medium-emphasis mb-1">
-      Tempo · {{ formatTempo(tempo) }}
+    <div class="d-flex align-center ga-2 mb-1">
+      <div class="text-caption text-medium-emphasis">
+        Tempo<template v-if="tempo"> · {{ formatTempo(tempo) }}</template>
+      </div>
+
+      <v-spacer />
+
+      <v-checkbox
+        v-model="withoutTempo"
+        color="primary"
+        density="compact"
+        hide-details
+        label="Without tempo"
+      />
     </div>
 
-    <v-row dense>
+    <v-row v-if="tempo" dense>
       <v-col
         v-for="(label, i) in labels"
         :key="i"
@@ -39,17 +51,39 @@
 
 <script lang="ts" setup>
   import type { Tempo } from '@/types/workout'
+  import { computed } from 'vue'
   import { formatTempo } from '@/utils/format'
 
-  const tempo = defineModel<Tempo>({ required: true })
+  const tempo = defineModel<Tempo | undefined>({ required: true })
 
   const labels = ['Down', 'Hold', 'Up', 'Hold']
 
+  // Kept while "without tempo" is checked, so unchecking brings back what the
+  // user had rather than the default.
+  let lastTempo: Tempo = [2, 0, 2, 0]
+
+  const withoutTempo = computed({
+    get: () => tempo.value === undefined,
+    set (value: boolean) {
+      if (value) {
+        if (tempo.value) {
+          lastTempo = tempo.value
+        }
+        tempo.value = undefined
+      } else {
+        tempo.value = [...lastTempo]
+      }
+    },
+  })
+
   function valueAt (index: number): number {
-    return tempo.value[index] ?? 0
+    return tempo.value?.[index] ?? 0
   }
 
   function step (index: number, delta: number) {
+    if (!tempo.value) {
+      return
+    }
     const next = [...tempo.value] as Tempo
     next[index] = Math.min(9, Math.max(0, valueAt(index) + delta))
     tempo.value = next

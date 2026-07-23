@@ -130,7 +130,7 @@
   const weightUnit = ref<WeightUnit>('kg')
   const reps = ref(8)
   const sets = ref(3)
-  const tempo = ref<Tempo>([2, 0, 2, 0])
+  const tempo = ref<Tempo | undefined>([2, 0, 2, 0])
   const confirmDelete = ref(false)
 
   const weightInvalid = ref(false)
@@ -185,7 +185,7 @@
         weightUnit.value = props.editEntry.weightUnit
         reps.value = props.editEntry.reps
         sets.value = props.editEntry.sets
-        tempo.value = [...props.editEntry.tempo]
+        tempo.value = props.editEntry.tempo && [...props.editEntry.tempo]
       } else {
         name.value = ''
         weight.value = 0
@@ -208,7 +208,7 @@
         weightUnit.value = last.weightUnit
         reps.value = last.reps
         sets.value = last.sets
-        tempo.value = [...last.tempo]
+        tempo.value = last.tempo && [...last.tempo]
       })
     }
   }
@@ -222,7 +222,7 @@
       id: props.editEntry?.id ?? crypto.randomUUID(),
       kind: 'workout',
       name: trimmedName.value,
-      tempo: [...tempo.value],
+      tempo: tempo.value && [...tempo.value],
       reps: reps.value,
       weight: weight.value,
       weightUnit: weightUnit.value,

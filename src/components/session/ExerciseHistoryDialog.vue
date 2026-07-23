@@ -22,7 +22,7 @@
               </v-list-item-title>
 
               <v-list-item-subtitle>
-                tempo {{ formatTempo(item.entry.tempo) }}
+                {{ item.entry.tempo ? `tempo ${formatTempo(item.entry.tempo)}` : 'without tempo' }}
               </v-list-item-subtitle>
             </v-list-item>
           </template>
