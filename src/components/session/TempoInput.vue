@@ -63,7 +63,7 @@
   let lastTempo: Tempo = [2, 0, 2, 0]
 
   const withoutTempo = computed({
-    get: () => tempo.value === undefined,
+    get: () => !tempo.value,
     set (value: boolean) {
       if (value) {
         if (tempo.value) {
