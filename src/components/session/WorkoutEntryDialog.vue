@@ -130,7 +130,7 @@
   const weight = ref(0)
   const weightUnit = ref<WeightUnit>('kg')
   const reps = ref(8)
-  const sets = ref(3)
+  const sets = ref(1)
   const tempo = ref<Tempo | undefined>([...DEFAULT_TEMPO])
   const confirmDelete = ref(false)
 
@@ -192,7 +192,7 @@
         weight.value = 0
         weightUnit.value = app.weightUnit
         reps.value = 8
-        sets.value = 3
+        sets.value = 1
         tempo.value = [...DEFAULT_TEMPO]
       }
     })
