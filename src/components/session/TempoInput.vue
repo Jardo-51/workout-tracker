@@ -24,10 +24,9 @@
         cols="3"
       >
         <v-btn
-          block
           :disabled="valueAt(i) >= 9"
           icon="$plus"
-          size="small"
+          size="large"
           variant="tonal"
           @click="step(i, 1)"
         />
@@ -35,10 +34,9 @@
         <div class="text-h5 my-1">{{ valueAt(i) }}</div>
 
         <v-btn
-          block
           :disabled="valueAt(i) <= 0"
           icon="$minus"
-          size="small"
+          size="large"
           variant="tonal"
           @click="step(i, -1)"
         />
