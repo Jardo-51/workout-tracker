@@ -185,7 +185,7 @@
         weightUnit.value = props.editEntry.weightUnit
         reps.value = props.editEntry.reps
         sets.value = props.editEntry.sets
-        tempo.value = props.editEntry.tempo && [...props.editEntry.tempo]
+        tempo.value = props.editEntry.tempo ? [...props.editEntry.tempo] : undefined
       } else {
         name.value = ''
         weight.value = 0
@@ -208,7 +208,7 @@
         weightUnit.value = last.weightUnit
         reps.value = last.reps
         sets.value = last.sets
-        tempo.value = last.tempo && [...last.tempo]
+        tempo.value = last.tempo ? [...last.tempo] : undefined
       })
     }
   }
@@ -222,7 +222,9 @@
       id: props.editEntry?.id ?? crypto.randomUUID(),
       kind: 'workout',
       name: trimmedName.value,
-      tempo: tempo.value && [...tempo.value],
+      // Omit the key entirely rather than storing `tempo: undefined`, so a
+      // locally-saved entry is shape-identical to one that came back from sync.
+      ...(tempo.value ? { tempo: [...tempo.value] as Tempo } : {}),
       reps: reps.value,
       weight: weight.value,
       weightUnit: weightUnit.value,
