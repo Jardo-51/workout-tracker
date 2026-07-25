@@ -60,14 +60,18 @@ test.describe('the home screen', () => {
 
     await page.clock.setFixedTime(new Date('2026-03-02T18:00:00Z'))
     await recordWorkout(page, 'Bench press')
+    // Moved on again, so the two same-day sessions have an order to be in:
+    // with one frozen time they would share a `startTime` and the sort
+    // between them would be undefined.
+    await page.clock.setFixedTime(new Date('2026-03-02T19:30:00Z'))
     await recordWorkout(page, 'Deadlift')
 
     await openHome(page)
     await expect(sessionRow(page)).toHaveCount(3)
     await expect(sessionRow(page)).toHaveText([
-      /Mar 2, 2026/,
-      /Mar 2, 2026/,
-      /Mar 1, 2026/,
+      /Mar 2, 2026.*07:30/s,
+      /Mar 2, 2026.*06:00/s,
+      /Mar 1, 2026.*09:00/s,
     ])
     await expect(sessionRow(page).last()).toContainText('1 exercises')
   })
