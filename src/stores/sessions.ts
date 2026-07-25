@@ -1,10 +1,18 @@
 import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { broadcastSessionChanged, onSessionChanged } from '@/services/broadcast'
-import { getAllSessions, getSession as getStoredSession, putSession } from '@/services/db'
+import { broadcastDataReplaced, broadcastSessionChanged, onDataReplaced, onSessionChanged } from '@/services/broadcast'
+import {
+  getAllSessions,
+  getSession as getStoredSession,
+  getSyncMeta,
+  putSession,
+  putSyncMeta,
+  replaceAllSessions,
+} from '@/services/db'
 import { errorMessage } from '@/utils/error'
 import { toDateKey } from '@/utils/format'
+import { compareSessions } from '@/utils/sessionOrder'
 
 function normalizeName (name: string): string {
   return name.trim().toLowerCase()
@@ -49,6 +57,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     // Another tab writing the same IndexedDB would otherwise be invisible
     // here, and our stale copy would overwrite its work on the next persist.
     onSessionChanged(id => void reloadSession(id))
+    onDataReplaced(() => void reloadAllSessions())
+  }
+
+  /** Re-reads the whole store, dropping anything another tab removed. */
+  async function reloadAllSessions () {
+    sessions.value = await getAllSessions()
   }
 
   function load (): Promise<void> {
@@ -179,6 +193,156 @@ export const useSessionsStore = defineStore('sessions', () => {
     await store(session)
   }
 
+  /**
+   * Makes sure the sync engine will push these sessions, whatever their stamp.
+   *
+   * It pushes what is dirty, and dirty means `updatedAt > syncedUpdatedAt` —
+   * strictly. A session that won its collision on `compareSessions`' content
+   * tie-break keeps the stamp of the copy it replaced, so if that copy had been
+   * synced the two are equal, the session is not dirty, and the server keeps
+   * the content that lost. Nothing brings it back down either: the server's
+   * item is unchanged, so no stoken delta mentions it. The device would just
+   * quietly disagree with the account forever.
+   *
+   * Backdating what the server was last told by one is the same trick
+   * `syncSessions` uses when a local copy beats an incoming remote one, and it
+   * costs nothing when the session is dirty already, which is the usual case.
+   */
+  async function forceDirty (written: Session[]) {
+    for (const session of written) {
+      const meta = await getSyncMeta(session.id)
+      if (meta && meta.syncedUpdatedAt >= session.updatedAt) {
+        await putSyncMeta({ ...meta, syncedUpdatedAt: session.updatedAt - 1 })
+      }
+    }
+  }
+
+  /**
+   * Restores a backup by merging it in: a session the file has and this device
+   * does not is added, one both have is resolved by `compareSessions`, and one
+   * only this device has is left alone. A deletion travels with it — the file
+   * carries tombstones, so a workout deleted before the export was written is
+   * deleted here too — but a session the file says nothing about is untouched.
+   *
+   * Merging rather than replacing, because replacing was only ever a
+   * replacement on a device with sync switched off. With sync on, the next run
+   * pulls the account back down and the end state is this merge anyway — so
+   * the destructive version of the import was not a second way of restoring, it
+   * was the same restore plus a data loss that depended on a setting in another
+   * card. Clearing first and then importing still gives an exact restore, now
+   * as a thing the user chooses rather than a side effect.
+   *
+   * Resolving with the sync engine's own comparison is what keeps the two
+   * consistent: a restored workout wins, or does not, for the same reason
+   * whether it came out of a file or off the server.
+   *
+   * The one collision `compareSessions` does not decide is a session the file
+   * still has and this device has only as a tombstone — which is every session
+   * in the file after a clear, the documented way to ask for an exact restore.
+   * The tombstone is necessarily the newer of the two (the clear stamped it
+   * after the export wrote the file), so the comparison would reject the whole
+   * restore. The file wins those outright instead: a tombstone holds nothing
+   * the user wrote, so there is nothing on this side to lose. It is given a
+   * stamp above the tombstone rather than the file's own, because the tombstone
+   * has by then reached the server and the other devices, and a restore
+   * carrying the older stamp would lose to it there and be wiped on the next
+   * sync — restored on this device, gone again a few seconds later.
+   *
+   * The sessions it writes are then run through `forceDirty`, so the merge's
+   * outcome reaches the server even where it did not move the stamp.
+   *
+   * Unlike the other mutations, this one lets a failed write reject: the caller
+   * awaits it and reports to the user, and nothing has been changed yet when
+   * the DB write is the thing that failed.
+   *
+   * @returns how many of the file's workouts were actually applied. Tombstones
+   * the file carries are applied too, but they are not workouts and the user is
+   * not told about them.
+   */
+  async function importSessions (imported: Session[]): Promise<number> {
+    const merged = [...sessions.value]
+    const written: Session[] = []
+    let workouts = 0
+    for (const session of imported) {
+      const index = merged.findIndex(s => s.id === session.id)
+      const local = index === -1 ? undefined : merged[index]!
+      if (!local) {
+        merged.push(session)
+      } else if (local.deleted && !session.deleted) {
+        merged[index] = { ...session, updatedAt: nextUpdatedAt(local) }
+      } else if (compareSessions(session, local) > 0) {
+        merged[index] = session
+      } else {
+        continue
+      }
+      written.push(index === -1 ? session : merged[index]!)
+      if (!session.deleted) {
+        workouts++
+      }
+    }
+    if (written.length === 0) {
+      return 0
+    }
+    // Before the sessions themselves, so a rejection here leaves the import as
+    // a whole undone. The cost is a session that was not imported after all
+    // being re-pushed once, which the server ends up with the same either way.
+    await forceDirty(written)
+    await replaceAllSessions(merged)
+    sessions.value = merged
+    storageError.value = null
+    broadcastDataReplaced()
+    // The sync store watches this and schedules a run.
+    mutationCount.value++
+    return workouts
+  }
+
+  /**
+   * Deletes every workout. Either way the entries and the note — everything
+   * the user actually wrote — go, rather than being kept for an undo, which is
+   * the point of a button that says it clears your data.
+   *
+   * `propagate` picks what is left behind, and the caller sets it from whether
+   * sync is configured:
+   *
+   * - `true`: each session becomes a bare tombstone, the way a single deleted
+   *   session already travels. Sync bookkeeping is deliberately *not* cleared,
+   *   so each tombstone is pushed as an update to the item the server already
+   *   holds and the deletion reaches the user's other devices. Dropping the
+   *   rows here instead would leave the server copies untouched, and the next
+   *   sync would pull every workout straight back.
+   *
+   * - `false`: the rows go too, leaving nothing on the device. Tombstones
+   *   would outlive a logged-out clear and carry a stamp newer than anything
+   *   on the server, so logging back in later would push them and delete the
+   *   account's data then — turning "clear this device" into "clear the
+   *   account", just deferred. Logging in again re-pulls the account's
+   *   workouts, which is the same thing any other fresh device does.
+   *
+   * Rejects on a failed write, like `importSessions`.
+   */
+  async function clearAllSessions (propagate: boolean) {
+    const cleared = propagate
+      ? sessions.value.map<Session>(session => ({
+          id: session.id,
+          dateKey: session.dateKey,
+          startTime: session.startTime,
+          entries: [],
+          // A session that is already a tombstone keeps its stamp: the server
+          // has that deletion, and a fresh stamp would only push it again as
+          // an identical update, on every clear, for every session the user
+          // ever deleted. It is still stripped, because a delete leaves the
+          // entries on the tombstone for the undo and a clear should not.
+          updatedAt: session.deleted ? session.updatedAt : nextUpdatedAt(session),
+          deleted: true,
+        }))
+      : []
+    await replaceAllSessions(cleared)
+    sessions.value = cleared
+    storageError.value = null
+    broadcastDataReplaced()
+    mutationCount.value++
+  }
+
   async function startSession (): Promise<Session> {
     const now = Date.now()
     const session: Session = {
@@ -282,6 +446,8 @@ export const useSessionsStore = defineStore('sessions', () => {
     storageError,
     load,
     upsertFromRemote,
+    importSessions,
+    clearAllSessions,
     visibleSessions,
     activeSession,
     exerciseNames,

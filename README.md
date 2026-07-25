@@ -26,6 +26,9 @@ pnpm build
 
 # Lint
 pnpm lint
+
+# Unit tests
+pnpm test
 ```
 
 Alternatively, if you use [Nix](https://nixos.org/), you can run commands via the project's dev shell:
@@ -33,6 +36,20 @@ Alternatively, if you use [Nix](https://nixos.org/), you can run commands via th
 ```bash
 nix develop -c pnpm dev
 ```
+
+### Tests
+
+`pnpm test` runs the unit tests (vitest, `src/**/*.test.ts`). The end-to-end
+tests drive the production build in a browser and need the *playwright* shell,
+which brings the browsers with it:
+
+```bash
+nix develop .#playwright -c pnpm test:e2e
+```
+
+The backup tests that involve sync skip themselves unless an Etesync server is
+configured — [`e2e/README.md`](e2e/README.md) has the one-line docker command
+and the environment variables.
 
 ## Project Structure
 
@@ -42,14 +59,16 @@ src/
 ├── components/
 │   ├── layout/      # Bottom navigation
 │   ├── session/     # Workout/break entry editors, history, steppers
-│   └── settings/    # Theme toggle, weight unit, Etesync sync
-├── services/        # IndexedDB, Etesync sync engine, cross-tab broadcast
+│   └── settings/    # Theme toggle, weight unit, Etesync sync, JSON backup
+├── services/        # IndexedDB, Etesync sync engine, cross-tab broadcast, backup format
 ├── stores/          # Pinia stores (app, sessions, sync)
 ├── utils/           # Formatting and error helpers
 ├── types/           # Shared TypeScript types
 ├── plugins/         # Vuetify, Pinia, Router config
 ├── router/          # Route definitions
 └── main.ts          # App entry point
+
+e2e/                 # Playwright tests, driven against the production build
 ```
 
 ## Browser Support
@@ -65,6 +84,58 @@ declared in `build.target` in `vite.config.mts`.
 - Full offline functionality via service worker caching
 - Auto-updates when a new version is deployed
 - No account required — your data stays on your device (IndexedDB)
+
+## Backup & Restore (JSON)
+
+Settings → Backup exports every workout to a JSON file
+(`workout-tracker-export-<date>_<time>.json`) and imports one back. The file is
+plain, readable JSON — a `sessions` array, the timestamp it was written at, and
+an `app`/`fileVersion` pair naming the format — so it doubles as a way to get the
+data out of the app for good. An import checks that pair first: without it a
+file is only recognisable by having something shaped like sessions in it, which
+another app's export could be too.
+
+Import **merges**, and asks for confirmation before it does. A workout the file
+has and the device does not is added; one both have is resolved last-write-wins,
+by the same comparison the sync engine uses; one only the device has is left
+alone. A restore is not a way to force an old copy over a newer one. To restore
+a file and nothing else, *Clear all workouts* first — an exact restore is then
+something you ask for rather than something an import does to you.
+
+The file holds deleted sessions as well, as the tombstones sync uses, so it is a
+copy of the whole device rather than only the part of it worth reading.
+That is what lets a restore reproduce the deletions too, and what makes clearing
+first work: a workout the file still has and the device has only as a tombstone
+is restored whatever the timestamps say, since a tombstone holds nothing of
+yours to lose. It is the one place the import overrides the comparison.
+
+The file is parsed and validated first: a session or entry this version cannot
+read aborts the whole import with the reason, since imported data is persisted
+and pushed to sync, where anything malformed would outlive the import.
+
+Merging is also the only behaviour that does not depend on a setting in another
+card. An import that replaced the local sessions only really replaced anything
+with sync switched off — with sync on, the next run pulled the account back down
+and the end state was this same merge. The destructive version was not a second
+way of restoring, it was this one plus a data loss.
+
+**Clear all workouts** deletes every session and the entries and notes on it.
+What it leaves behind depends on whether you are logged in to sync, and the
+confirmation dialog says which one you are about to get:
+
+- **Logged in**, each session is kept as a bare tombstone — no content, just an
+  id and a timestamp — for the same reason a single deleted session is: that is
+  what carries the deletion to your other devices on the next sync. Removing the
+  rows outright would leave the server copies alone and the next sync would pull
+  everything straight back. So this clears the account, not just the device.
+- **Logged out**, the rows go too and nothing is left. Tombstones would outlive
+  the clear carrying a stamp newer than anything on the server, so logging back
+  in later would push them and take the account's data with them — a device
+  clear turning into an account clear, just deferred. Logging in again re-pulls
+  the account's workouts the way any other fresh device does.
+
+So log out first if you want to clear this device and keep what is on the
+server.
 
 ## Etesync Sync (optional)
 

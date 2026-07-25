@@ -8,6 +8,7 @@ import {
   setMeta,
 } from '@/services/db'
 import { SYNC_META_PREFIX } from '@/services/db.constants'
+import { compareSessions } from '@/utils/sessionOrder'
 
 const COLLECTION_TYPE = 'workout-tracker.sessions'
 const ITEM_TYPE = 'workout-session'
@@ -129,6 +130,10 @@ export interface SyncResult {
  * fields something actually dereferences are required — `name` is read for
  * workout entries, and `id` keys the render loop — so an entry of a kind a
  * future version adds still travels through this one intact.
+ *
+ * `backup.ts` has a namesake that checks a known kind's every field, since a
+ * file can arrive hand-edited. The two agree on this part on purpose: an entry
+ * that syncs in has to be one an export can carry back out.
  */
 function isSessionEntry (value: unknown): value is SessionEntry {
   if (typeof value !== 'object' || value === null) {
@@ -177,37 +182,22 @@ async function decodeSession (item: Etebase.Item): Promise<Session | undefined> 
 }
 
 /**
- * Total order over two versions of a session, computed identically on every
- * device: the newer `updatedAt` wins, and on a tie the lexicographically
- * larger serialization does.
- *
- * Ties are not a corner case. `nextUpdatedAt` derives the stamp from the
- * session's own previous value, so two devices editing the same synced copy
- * while their clocks sit at or behind it both produce the same stamp. Ordering
- * on `updatedAt` alone would then leave each device keeping its own version
- * and recording it as synced — diverging permanently, with neither side aware.
- */
-function compareSessions (a: Session, b: Session): number {
-  if (a.updatedAt !== b.updatedAt) {
-    return a.updatedAt - b.updatedAt
-  }
-  const contentA = JSON.stringify(a)
-  const contentB = JSON.stringify(b)
-  if (contentA === contentB) {
-    return 0
-  }
-  return contentA < contentB ? -1 : 1
-}
-
-/**
  * Two-way sync: pull remote changes since the saved stoken (conflicts resolved
  * by `compareSessions`), then push every local session whose updatedAt is
  * newer than what the server has seen. Tombstoned sessions sync like any
  * other session, so deletions propagate.
+ *
+ * The local sessions arrive as a getter rather than an array, because a run
+ * spans many awaits and the store can be replaced wholesale under it: a backup
+ * import and `clearAllSessions` both install a new array. Holding the one we
+ * were handed would mean pulling remote items against sessions that are gone
+ * — writing them back into a store the clear had just emptied — and pushing
+ * pre-clear content over the tombstones meant to replace it. Reading it afresh
+ * makes the replacement visible to the rest of the run instead.
  */
 export async function syncSessions (
   account: Account,
-  localSessions: Session[],
+  localSessions: () => Session[],
   applyRemote: (session: Session) => Promise<void>,
 ): Promise<SyncResult> {
   const { collectionManager, collection } = await ensureCollection(account)
@@ -228,7 +218,7 @@ export async function syncSessions (
         skipped++
         continue
       }
-      const local = localSessions.find(s => s.id === remote.id)
+      const local = localSessions().find(s => s.id === remote.id)
       const order = local ? compareSessions(remote, local) : 1
       if (order > 0) {
         await applyRemote(remote)
@@ -253,7 +243,7 @@ export async function syncSessions (
 
   // Push
   const dirty: Array<{ session: Session, meta: Awaited<ReturnType<typeof getSyncMeta>> }> = []
-  for (const session of localSessions) {
+  for (const session of localSessions()) {
     const meta = await getSyncMeta(session.id)
     if (!meta || session.updatedAt > meta.syncedUpdatedAt) {
       dirty.push({ session, meta })

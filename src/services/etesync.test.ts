@@ -47,7 +47,7 @@ describe('syncSessions', () => {
       const local = [makeSession('s1', 10)]
       const { applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), local, applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => local, applyRemote)
 
       expect(result.pushed).toBe(1)
       const collectionUid = server.soleCollection()
@@ -59,8 +59,8 @@ describe('syncSessions', () => {
       const { applyRemote } = applyRemoteSpy()
       const account = fakeAccount(server)
 
-      await syncSessions(account, local, applyRemote)
-      const second = await syncSessions(account, local, applyRemote)
+      await syncSessions(account, () => local, applyRemote)
+      const second = await syncSessions(account, () => local, applyRemote)
 
       expect(second.pushed).toBe(0)
       expect(second.pulled).toBe(0)
@@ -70,11 +70,11 @@ describe('syncSessions', () => {
       const session = makeSession('s1', 10)
       const { applyRemote } = applyRemoteSpy()
       const account = fakeAccount(server)
-      await syncSessions(account, [session], applyRemote)
+      await syncSessions(account, () => [session], applyRemote)
 
       session.updatedAt = 20
       session.note = 'edited'
-      const result = await syncSessions(account, [session], applyRemote)
+      const result = await syncSessions(account, () => [session], applyRemote)
 
       expect(result.pushed).toBe(1)
       const collectionUid = server.soleCollection()
@@ -85,7 +85,7 @@ describe('syncSessions', () => {
       const session = makeSession('s1', 10, { deleted: true, entries: [] })
       const { applyRemote } = applyRemoteSpy()
 
-      await syncSessions(fakeAccount(server), [session], applyRemote)
+      await syncSessions(fakeAccount(server), () => [session], applyRemote)
 
       const collectionUid = server.soleCollection()
       expect(server.contents(collectionUid)).toEqual([
@@ -97,11 +97,34 @@ describe('syncSessions', () => {
       const local = Array.from({ length: 45 }, (_, i) => makeSession(`s${i}`, 10))
       const { applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), local, applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => local, applyRemote)
 
       expect(result.pushed).toBe(45)
       const collectionUid = server.soleCollection()
       expect(server.contents(collectionUid)).toHaveLength(45)
+    })
+  })
+
+  describe('a store replaced mid-run', () => {
+    it('works from what the clear installed, not what the run started with', async () => {
+      const collection = server.seedCollection('col-a', COLLECTION_TYPE)
+      server.seedItem(collection.uid, 'item-1', JSON.stringify(makeSession('s1', 20)))
+      const store = { sessions: [makeSession('s1', 10)] }
+      const { applied, applyRemote } = applyRemoteSpy()
+
+      const run = syncSessions(fakeAccount(server), () => store.sessions, applyRemote)
+      // `clearAllSessions` installs a new array while the run is awaiting the
+      // server. Held rather than re-read, the pull below would write the remote
+      // session back into a store that had just been emptied, and the push
+      // would send the pre-clear content the tombstone is meant to replace.
+      store.sessions = [makeSession('s1', 30, { deleted: true })]
+      const result = await run
+
+      expect(applied).toEqual([])
+      expect(result.pulled).toBe(0)
+      expect(server.contents(collection.uid)).toEqual([
+        expect.objectContaining({ id: 's1', deleted: true }),
+      ])
     })
   })
 
@@ -112,7 +135,7 @@ describe('syncSessions', () => {
       server.seedItem(collection.uid, 'item-1', JSON.stringify(remote))
       const { applied, applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), [], applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => [], applyRemote)
 
       expect(result.pulled).toBe(1)
       expect(applied).toEqual([remote])
@@ -125,7 +148,7 @@ describe('syncSessions', () => {
       }
       const { applied, applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), [], applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => [], applyRemote)
 
       expect(result.pulled).toBe(120)
       expect(applied).toHaveLength(120)
@@ -136,10 +159,10 @@ describe('syncSessions', () => {
       server.seedItem(collection.uid, 'item-1', JSON.stringify(makeSession('s1', 10)))
       const account = fakeAccount(server)
       const first = applyRemoteSpy()
-      await syncSessions(account, [], first.applyRemote)
+      await syncSessions(account, () => [], first.applyRemote)
 
       const second = applyRemoteSpy()
-      const result = await syncSessions(account, [], second.applyRemote)
+      const result = await syncSessions(account, () => [], second.applyRemote)
 
       expect(result.pulled).toBe(0)
       expect(second.applied).toEqual([])
@@ -154,7 +177,7 @@ describe('syncSessions', () => {
       const local = [makeSession('s1', 10, { note: 'older' })]
       const { applied, applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), local, applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => local, applyRemote)
 
       expect(result.pulled).toBe(1)
       expect(applied).toEqual([remote])
@@ -166,7 +189,7 @@ describe('syncSessions', () => {
       const local = [makeSession('s1', 20, { note: 'newer' })]
       const { applied, applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), local, applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => local, applyRemote)
 
       expect(applied).toEqual([])
       expect(result.pushed).toBe(1)
@@ -185,7 +208,7 @@ describe('syncSessions', () => {
       const local = [makeSession('s1', 10, { note: 'aaa' })]
       const { applied, applyRemote } = applyRemoteSpy()
 
-      await syncSessions(fakeAccount(server), local, applyRemote)
+      await syncSessions(fakeAccount(server), () => local, applyRemote)
 
       // 'bbb' sorts above 'aaa', so the remote wins on both sides: this device
       // adopts it, and the device that holds it leaves it alone.
@@ -199,7 +222,7 @@ describe('syncSessions', () => {
       server.seedItem(collection.uid, 'item-1', JSON.stringify(session))
       const { applied, applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), [session], applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => [session], applyRemote)
 
       expect(applied).toEqual([])
       expect(result.pushed).toBe(0)
@@ -225,7 +248,7 @@ describe('syncSessions', () => {
       server.seedItem(collection.uid, 'good', JSON.stringify(makeSession('s2', 10)))
       const { applied, applyRemote } = applyRemoteSpy()
 
-      const result = await syncSessions(fakeAccount(server), [], applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => [], applyRemote)
 
       expect(result.skipped).toBe(1)
       expect(applied.map(session => session.id)).toEqual(['s2'])
@@ -241,9 +264,9 @@ describe('syncSessions', () => {
       server.seedItem(collection.uid, 'bad', 'not json at all')
       const account = fakeAccount(server)
       const first = applyRemoteSpy()
-      await syncSessions(account, [], first.applyRemote)
+      await syncSessions(account, () => [], first.applyRemote)
 
-      const second = await syncSessions(account, [], applyRemoteSpy().applyRemote)
+      const second = await syncSessions(account, () => [], applyRemoteSpy().applyRemote)
 
       expect(second.skipped).toBe(0)
     })
@@ -255,7 +278,7 @@ describe('syncSessions', () => {
       server.seedItem(collection.uid, 'good', JSON.stringify(good))
       const { applied, applyRemote } = applyRemoteSpy()
 
-      await syncSessions(fakeAccount(server), [], applyRemote)
+      await syncSessions(fakeAccount(server), () => [], applyRemote)
 
       expect(applied).toEqual([good])
     })
@@ -263,7 +286,7 @@ describe('syncSessions', () => {
 
   describe('collection selection', () => {
     it('creates the collection on first sync', async () => {
-      await syncSessions(fakeAccount(server), [], applyRemoteSpy().applyRemote)
+      await syncSessions(fakeAccount(server), () => [], applyRemoteSpy().applyRemote)
 
       expect([...server.collections.values()].map(collection => collection.type))
         .toEqual([COLLECTION_TYPE])
@@ -272,7 +295,7 @@ describe('syncSessions', () => {
     it('reuses a collection another device already created', async () => {
       server.seedCollection('col-existing', COLLECTION_TYPE)
 
-      await syncSessions(fakeAccount(server), [makeSession('s1', 10)], applyRemoteSpy().applyRemote)
+      await syncSessions(fakeAccount(server), () => [makeSession('s1', 10)], applyRemoteSpy().applyRemote)
 
       expect([...server.collections.keys()]).toEqual(['col-existing'])
       expect(server.contents('col-existing')).toHaveLength(1)
@@ -287,7 +310,7 @@ describe('syncSessions', () => {
       server.seedCollection('col-b', COLLECTION_TYPE)
       server.seedCollection('col-a', COLLECTION_TYPE)
 
-      await syncSessions(fakeAccount(server), [makeSession('s1', 10)], applyRemoteSpy().applyRemote)
+      await syncSessions(fakeAccount(server), () => [makeSession('s1', 10)], applyRemoteSpy().applyRemote)
 
       expect(server.contents('col-a')).toHaveLength(1)
       expect(server.contents('col-b')).toHaveLength(0)
@@ -298,13 +321,13 @@ describe('syncSessions', () => {
       // This device synced into col-b before the other device's col-a existed.
       server.seedCollection('col-b', COLLECTION_TYPE)
       const local = [makeSession('s1', 10)]
-      await syncSessions(fakeAccount(server), local, applyRemoteSpy().applyRemote)
+      await syncSessions(fakeAccount(server), () => local, applyRemoteSpy().applyRemote)
       expect(server.contents('col-b')).toHaveLength(1)
 
       // The other device's collection shows up and wins on uid. A fresh
       // account stands in for the next app start, when the check runs.
       server.seedCollection('col-a', COLLECTION_TYPE)
-      const result = await syncSessions(fakeAccount(server), local, applyRemoteSpy().applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => local, applyRemoteSpy().applyRemote)
 
       // Without dropping the sync bookkeeping the session would look clean and
       // stay stranded in col-b.
@@ -314,10 +337,10 @@ describe('syncSessions', () => {
 
     it('checks the collection once per app start, not once per sync', async () => {
       const account = fakeAccount(server)
-      await syncSessions(account, [], applyRemoteSpy().applyRemote)
+      await syncSessions(account, () => [], applyRemoteSpy().applyRemote)
       const afterFirst = server.collectionListCount
 
-      await syncSessions(account, [], applyRemoteSpy().applyRemote)
+      await syncSessions(account, () => [], applyRemoteSpy().applyRemote)
 
       expect(server.collectionListCount).toBe(afterFirst)
     })
@@ -325,7 +348,7 @@ describe('syncSessions', () => {
 
   describe('sync bookkeeping', () => {
     it('records the item uid and synced stamp for a pushed session', async () => {
-      await syncSessions(fakeAccount(server), [makeSession('s1', 10)], applyRemoteSpy().applyRemote)
+      await syncSessions(fakeAccount(server), () => [makeSession('s1', 10)], applyRemoteSpy().applyRemote)
 
       expect(fakeDb.syncMeta.get('s1')).toMatchObject({ sessionId: 's1', syncedUpdatedAt: 10 })
     })
@@ -342,7 +365,7 @@ describe('syncSessions', () => {
       // Same stamp, content that wins the tie-break, so local must survive.
       const local = [makeSession('s1', 10, { note: 'zzz' })]
 
-      const result = await syncSessions(fakeAccount(server), local, applyRemoteSpy().applyRemote)
+      const result = await syncSessions(fakeAccount(server), () => local, applyRemoteSpy().applyRemote)
 
       expect(result.pulled).toBe(0)
       expect(result.pushed).toBe(1)

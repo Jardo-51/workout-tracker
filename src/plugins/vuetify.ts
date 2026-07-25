@@ -2,6 +2,7 @@ import {
   mdiArrowLeft,
   mdiCog,
   mdiDeleteOutline,
+  mdiDownload,
   mdiDumbbell,
   mdiHistory,
   mdiHome,
@@ -9,6 +10,7 @@ import {
   mdiPlayCircle,
   mdiStarOutline,
   mdiTimerSand,
+  mdiUpload,
 } from '@mdi/js'
 import { createVuetify } from 'vuetify'
 import { mdi, aliases as vuetifyAliases } from 'vuetify/iconsets/mdi-svg'
@@ -30,6 +32,7 @@ const aliases = {
   arrowLeft: mdiArrowLeft,
   cog: mdiCog,
   deleteOutline: mdiDeleteOutline,
+  download: mdiDownload,
   dumbbell: mdiDumbbell,
   history: mdiHistory,
   home: mdiHome,
@@ -37,6 +40,7 @@ const aliases = {
   playCircle: mdiPlayCircle,
   starOutline: mdiStarOutline,
   timerSand: mdiTimerSand,
+  upload: mdiUpload,
 }
 
 // Read the persisted preference (same key the app store uses) so a dark-mode
