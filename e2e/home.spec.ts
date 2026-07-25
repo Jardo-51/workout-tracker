@@ -51,7 +51,7 @@ test.describe('the home screen', () => {
     await expect(entryCard(page, 'Squat')).toBeVisible()
   })
 
-  test('lists finished sessions newest first, one row a day', async ({ page }) => {
+  test('lists finished sessions newest first, one row each', async ({ page }) => {
     // The only way to a second date: sessions take their day from the clock
     // when they start, and a run cannot wait for tomorrow.
     await page.clock.setFixedTime(new Date('2026-03-01T09:00:00Z'))
