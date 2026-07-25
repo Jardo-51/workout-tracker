@@ -38,6 +38,11 @@ function makeSession (id = 'a'): Session {
   }
 }
 
+/** The bare shape a delete or a clear leaves behind. */
+function tombstoneFor (id: string, updatedAt: number): Session {
+  return { id, dateKey: '2026-07-07', startTime: 1000, entries: [], updatedAt, deleted: true }
+}
+
 function storeWith (...sessions: Session[]) {
   const store = useSessionsStore()
   store.sessions = sessions
@@ -148,6 +153,44 @@ describe('importSessions', () => {
 
     expect(store.sessions[0]).toEqual(compareSessions(fromFile, local) > 0 ? fromFile : local)
     expect(store.sessions[0]!.note).toBe('zzz')
+  })
+
+  it('restores a workout the device has only as a tombstone', async () => {
+    const store = storeWith(tombstoneFor('a', FUTURE + 5))
+
+    const applied = await store.importSessions([makeSession('a')])
+
+    expect(applied).toBe(1)
+    expect(store.visibleSessions).toHaveLength(1)
+    expect(store.sessions[0]).toMatchObject({ id: 'a', note: 'felt strong' })
+    // Above the tombstone, which the server and the other devices already have;
+    // the file's own stamp would lose to it there and be wiped on the next sync.
+    expect(store.sessions[0]!.updatedAt).toBe(FUTURE + 6)
+  })
+
+  it('restores everything after a clear, which is what clearing first is for', async () => {
+    const exported = [makeSession('a'), makeSession('b')]
+    const store = storeWith(makeSession('a'), makeSession('b'))
+    await store.clearAllSessions(true)
+
+    const applied = await store.importSessions(exported)
+
+    expect(applied).toBe(2)
+    expect(store.visibleSessions.map(s => s.id).toSorted()).toEqual(['a', 'b'])
+    expect(store.visibleSessions[0]).toMatchObject({
+      note: 'felt strong',
+      entries: [{ id: 'a-e', kind: 'break', durationSec: 90 }],
+    })
+  })
+
+  it('applies a deletion the file carries, and does not count it as a workout', async () => {
+    const store = storeWith(withStamp('a', 100))
+
+    const applied = await store.importSessions([tombstoneFor('a', 200)])
+
+    expect(applied).toBe(0)
+    expect(store.visibleSessions).toEqual([])
+    expect(db.replaceAllSessions).toHaveBeenCalled()
   })
 
   it('keeps the sync bookkeeping — merged sessions are already dirty', async () => {

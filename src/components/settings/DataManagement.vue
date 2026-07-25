@@ -5,8 +5,8 @@
     <v-card-text>
       <div class="text-body-2 text-medium-emphasis mb-4">
         Save every workout to a JSON file you keep yourself, or restore one.
-        Importing adds the file's workouts to this device and never deletes
-        anything.
+        Importing merges the file into this device: what it has is added, and
+        what only this device has is left alone.
       </div>
 
       <div class="d-flex ga-2">
@@ -56,9 +56,10 @@
       <v-card-title>Import backup?</v-card-title>
 
       <v-card-text>
-        This adds the {{ pending.length }} workout(s) in the file to the
-        {{ workoutCount }} already here. None are deleted, and one you already
-        have is only overwritten where the file's copy is newer.
+        This adds the {{ pendingWorkouts }} workout(s) in the file to the
+        {{ workoutCount }} already here. One you already have is overwritten
+        where the file's copy is newer, and one you deleted before the file was
+        written is deleted here too.
 
         <template v-if="sync.configured">
           They reach your other devices on the next sync.
@@ -126,6 +127,8 @@
   const pending = ref<Session[]>([])
 
   const workoutCount = computed(() => sessions.visibleSessions.length)
+  /** The file's workouts; it also carries tombstones, which are not workouts. */
+  const pendingWorkouts = computed(() => pending.value.filter(s => !s.deleted).length)
 
   // Settings is reachable directly on a cold start, so the sessions may not
   // have been read yet — the counts and the Clear button need them.
@@ -134,9 +137,13 @@
   async function doExport () {
     // Guards the click that beats the load kicked off on mount.
     await sessions.load()
-    // Tombstones are sync bookkeeping, not workouts — they would only show up
-    // as junk in a file the user is meant to be able to read.
-    const backup = buildBackup(sessions.visibleSessions)
+    // Tombstones go in the file too, so it is the whole of what this device
+    // holds rather than only the part of it a human would want to read. They
+    // are what carries a deletion: a device that still has a workout this one
+    // deleted before the export drops it on import, the same way it would have
+    // over sync. Leaving them out would make the file quietly weaker than the
+    // state it claims to be a copy of. The count below stays about workouts.
+    const backup = buildBackup(sessions.sessions)
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -144,7 +151,7 @@
     link.download = backupFileName()
     link.click()
     URL.revokeObjectURL(url)
-    app.showSnackbar(`Exported ${backup.sessions.length} workout(s)`)
+    app.showSnackbar(`Exported ${workoutCount.value} workout(s)`)
   }
 
   /**
@@ -171,7 +178,7 @@
 
   async function doImport () {
     importing.value = true
-    const total = pending.value.length
+    const total = pendingWorkouts.value
     try {
       const applied = await sessions.importSessions(pending.value)
       // A session the file has an older copy of is skipped, so saying the file

@@ -208,30 +208,48 @@ export const useSessionsStore = defineStore('sessions', () => {
    * consistent: a restored workout wins, or does not, for the same reason
    * whether it came out of a file or off the server.
    *
-   * Sync bookkeeping is left alone. Every session this writes has a stamp above
-   * the one it replaced, and above what the server was last told, so it is
-   * already dirty and the next sync pushes it.
+   * The one collision `compareSessions` does not decide is a session the file
+   * still has and this device has only as a tombstone — which is every session
+   * in the file after a clear, the documented way to ask for an exact restore.
+   * The tombstone is necessarily the newer of the two (the clear stamped it
+   * after the export wrote the file), so the comparison would reject the whole
+   * restore. The file wins those outright instead: a tombstone holds nothing
+   * the user wrote, so there is nothing on this side to lose. It is given a
+   * stamp above the tombstone rather than the file's own, because the tombstone
+   * has by then reached the server and the other devices, and a restore
+   * carrying the older stamp would lose to it there and be wiped on the next
+   * sync — restored on this device, gone again a few seconds later.
    *
    * Unlike the other mutations, this one lets a failed write reject: the caller
    * awaits it and reports to the user, and nothing has been changed yet when
    * the DB write is the thing that failed.
    *
-   * @returns how many of the file's sessions were actually applied.
+   * @returns how many of the file's workouts were actually applied. Tombstones
+   * the file carries are applied too, but they are not workouts and the user is
+   * not told about them.
    */
   async function importSessions (imported: Session[]): Promise<number> {
     const merged = [...sessions.value]
-    let applied = 0
+    let changed = 0
+    let workouts = 0
     for (const session of imported) {
       const index = merged.findIndex(s => s.id === session.id)
-      if (index === -1) {
+      const local = index === -1 ? undefined : merged[index]!
+      if (!local) {
         merged.push(session)
-        applied++
-      } else if (compareSessions(session, merged[index]!) > 0) {
+      } else if (local.deleted && !session.deleted) {
+        merged[index] = { ...session, updatedAt: nextUpdatedAt(local) }
+      } else if (compareSessions(session, local) > 0) {
         merged[index] = session
-        applied++
+      } else {
+        continue
+      }
+      changed++
+      if (!session.deleted) {
+        workouts++
       }
     }
-    if (applied === 0) {
+    if (changed === 0) {
       return 0
     }
     await replaceAllSessions(merged)
@@ -240,7 +258,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     broadcastDataReplaced()
     // The sync store watches this and schedules a run.
     mutationCount.value++
-    return applied
+    return workouts
   }
 
   /**
