@@ -83,8 +83,8 @@ alone. A restore is not a way to force an old copy over a newer one. To restore
 a file and nothing else, *Clear all workouts* first — an exact restore is then
 something you ask for rather than something an import does to you.
 
-The file holds deleted sessions as well, as the bare tombstones sync uses, so it
-is a copy of the whole device rather than only the part of it worth reading.
+The file holds deleted sessions as well, as the tombstones sync uses, so it is a
+copy of the whole device rather than only the part of it worth reading.
 That is what lets a restore reproduce the deletions too, and what makes clearing
 first work: a workout the file still has and the device has only as a tombstone
 is restored whatever the timestamps say, since a tombstone holds nothing of
