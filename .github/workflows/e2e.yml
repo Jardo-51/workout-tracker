@@ -66,10 +66,18 @@ jobs:
             pnpm install --frozen-lockfile
           "
 
+      # Deliberately without `--with-deps`: that path shells out to
+      # `sudo -- sh -c "apt-get update && apt-get install ..."`, with the job's
+      # environment dropped (no `sudo -E`) and stdio inherited, so anything apt
+      # asks — a needrestart prompt, a held lock — blocks with nothing to answer
+      # it and the step hangs until the job timeout. The runner image already
+      # carries the libraries chromium needs. If one ever goes missing, install
+      # it in its own explicitly non-interactive step rather than through here.
       - name: Install browser
+        timeout-minutes: 5
         run: |
           nix develop --command bash -c "
-            pnpm exec playwright install --with-deps chromium
+            pnpm exec playwright install chromium
           "
 
       - name: Wait for the Etesync server
