@@ -71,9 +71,10 @@ export async function putSession (session: Session): Promise<void> {
 }
 
 /**
- * Swaps the whole sessions store for `sessions` (backup import). One
- * transaction, so a failure part-way leaves the previous contents intact
- * rather than a half-restored mix of the two.
+ * Swaps the whole sessions store for `sessions` — the merged set after a
+ * backup import, or the tombstones left by a clear. One transaction, so a
+ * failure part-way leaves the previous contents intact rather than a half
+ * written mix of the two.
  */
 export async function replaceAllSessions (sessions: Session[]): Promise<void> {
   const db = await getDB()

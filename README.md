@@ -73,20 +73,23 @@ Settings → Backup exports every workout to a JSON file
 plain, readable JSON — a `sessions` array plus the timestamp it was written at —
 so it doubles as a way to get the data out of the app for good.
 
-Import **replaces** all workouts on the device rather than merging them, and
-asks for confirmation before it does. The file is parsed and validated first: a
-session or entry this version cannot read aborts the whole import with the
-reason, since imported data is persisted and pushed to sync, where anything
-malformed would outlive the import.
+Import **merges**, and asks for confirmation before it does. A workout the file
+has and the device does not is added; one both have is resolved last-write-wins,
+by the same comparison the sync engine uses; one only the device has is left
+alone. Nothing is ever deleted, and a restore is not a way to force an old copy
+over a newer one. To restore a file and nothing else, *Clear all workouts*
+first — an exact restore is then something you ask for rather than something an
+import does to you.
 
-If sync is configured, importing also drops the local sync bookkeeping, so the
-next run re-pulls the collection in full and re-pushes every imported session.
-That makes the replacement local and momentary: the net effect on the account is
-a **merge**. The imported sessions reach the other devices, anything on the
-server that was not in the file comes back to this one, and a session that
-exists in both resolves under the usual last-write-wins rule — so a restore is
-neither a way to force old data over newer data on the server, nor a way to
-delete anything from the account. Use *Clear all workouts* for that.
+The file is parsed and validated first: a session or entry this version cannot
+read aborts the whole import with the reason, since imported data is persisted
+and pushed to sync, where anything malformed would outlive the import.
+
+Merging is also the only behaviour that does not depend on a setting in another
+card. An import that replaced the local sessions only really replaced anything
+with sync switched off — with sync on, the next run pulled the account back down
+and the end state was this same merge. The destructive version was not a second
+way of restoring, it was this one plus a data loss.
 
 **Clear all workouts** deletes every session and the entries and notes on it.
 What it leaves behind depends on whether you are logged in to sync, and the

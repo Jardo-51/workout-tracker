@@ -5,7 +5,8 @@
     <v-card-text>
       <div class="text-body-2 text-medium-emphasis mb-4">
         Save every workout to a JSON file you keep yourself, or restore one.
-        Importing replaces the workouts on this device<template v-if="sync.configured">, and the next sync then merges them with your account</template>.
+        Importing adds the file's workouts to this device and never deletes
+        anything.
       </div>
 
       <div class="d-flex ga-2">
@@ -55,20 +56,23 @@
       <v-card-title>Import backup?</v-card-title>
 
       <v-card-text>
-        This replaces the {{ workoutCount }} workout(s) on this device with the
-        {{ pending.length }} in the file. It cannot be undone.
+        This adds the {{ pending.length }} workout(s) in the file to the
+        {{ workoutCount }} already here. None are deleted, and one you already
+        have is only overwritten where the file's copy is newer.
 
         <template v-if="sync.configured">
-          The next sync then merges that with your account: the imported
-          workouts go to your other devices, and anything on the server that is
-          not in the file comes back here.
+          They reach your other devices on the next sync.
+        </template>
+
+        <template v-if="workoutCount > 0">
+          To restore the file and nothing else, clear the workouts first.
         </template>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
         <v-btn @click="cancelImport">Cancel</v-btn>
-        <v-btn color="error" :loading="importing" @click="doImport">Import</v-btn>
+        <v-btn color="primary" :loading="importing" @click="doImport">Import</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -167,9 +171,14 @@
 
   async function doImport () {
     importing.value = true
+    const total = pending.value.length
     try {
-      await sessions.importSessions(pending.value)
-      app.showSnackbar(`Imported ${pending.value.length} workout(s)`)
+      const applied = await sessions.importSessions(pending.value)
+      // A session the file has an older copy of is skipped, so saying the file
+      // was imported in full would be a lie the user could later trip over.
+      app.showSnackbar(applied === total
+        ? `Imported ${total} workout(s)`
+        : `Imported ${applied} of ${total} workout(s) — the rest were already here`)
       confirmImport.value = false
       pending.value = []
     } catch (error) {

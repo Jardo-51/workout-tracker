@@ -8,6 +8,7 @@ import {
   setMeta,
 } from '@/services/db'
 import { SYNC_META_PREFIX } from '@/services/db.constants'
+import { compareSessions } from '@/utils/sessionOrder'
 
 const COLLECTION_TYPE = 'workout-tracker.sessions'
 const ITEM_TYPE = 'workout-session'
@@ -174,29 +175,6 @@ async function decodeSession (item: Etebase.Item): Promise<Session | undefined> 
     console.warn('[sync] skipping unreadable remote item:', item.uid, error)
   }
   return undefined
-}
-
-/**
- * Total order over two versions of a session, computed identically on every
- * device: the newer `updatedAt` wins, and on a tie the lexicographically
- * larger serialization does.
- *
- * Ties are not a corner case. `nextUpdatedAt` derives the stamp from the
- * session's own previous value, so two devices editing the same synced copy
- * while their clocks sit at or behind it both produce the same stamp. Ordering
- * on `updatedAt` alone would then leave each device keeping its own version
- * and recording it as synced — diverging permanently, with neither side aware.
- */
-function compareSessions (a: Session, b: Session): number {
-  if (a.updatedAt !== b.updatedAt) {
-    return a.updatedAt - b.updatedAt
-  }
-  const contentA = JSON.stringify(a)
-  const contentB = JSON.stringify(b)
-  if (contentA === contentB) {
-    return 0
-  }
-  return contentA < contentB ? -1 : 1
 }
 
 /**

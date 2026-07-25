@@ -3,7 +3,6 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { broadcastDataReplaced, broadcastSessionChanged, onDataReplaced, onSessionChanged } from '@/services/broadcast'
 import {
-  clearSyncState,
   getAllSessions,
   getSession as getStoredSession,
   putSession,
@@ -11,6 +10,7 @@ import {
 } from '@/services/db'
 import { errorMessage } from '@/utils/error'
 import { toDateKey } from '@/utils/format'
+import { compareSessions } from '@/utils/sessionOrder'
 
 function normalizeName (name: string): string {
   return name.trim().toLowerCase()
@@ -192,27 +192,55 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   /**
-   * Restores a backup: the imported sessions become the entire local set.
+   * Restores a backup by merging it in: a session the file has and this device
+   * does not is added, one both have is resolved by `compareSessions`, and one
+   * only this device has is left alone. Nothing is ever deleted.
    *
-   * Sync bookkeeping is dropped along with the old data. It records what the
-   * server has already seen per session, and an imported session whose
-   * `updatedAt` sits at or below that stamp would look clean and never be
-   * pushed — the restore would simply never leave the device. Clearing it also
-   * drops the stoken, so the next sync re-pulls the collection in full and the
-   * two sides converge under the usual last-write-wins rule.
+   * Merging rather than replacing, because replacing was only ever a
+   * replacement on a device with sync switched off. With sync on, the next run
+   * pulls the account back down and the end state is this merge anyway — so
+   * the destructive version of the import was not a second way of restoring, it
+   * was the same restore plus a data loss that depended on a setting in another
+   * card. Clearing first and then importing still gives an exact restore, now
+   * as a thing the user chooses rather than a side effect.
+   *
+   * Resolving with the sync engine's own comparison is what keeps the two
+   * consistent: a restored workout wins, or does not, for the same reason
+   * whether it came out of a file or off the server.
+   *
+   * Sync bookkeeping is left alone. Every session this writes has a stamp above
+   * the one it replaced, and above what the server was last told, so it is
+   * already dirty and the next sync pushes it.
    *
    * Unlike the other mutations, this one lets a failed write reject: the caller
    * awaits it and reports to the user, and nothing has been changed yet when
    * the DB write is the thing that failed.
+   *
+   * @returns how many of the file's sessions were actually applied.
    */
-  async function importSessions (imported: Session[]) {
-    await replaceAllSessions(imported)
-    await clearSyncState()
-    sessions.value = imported
+  async function importSessions (imported: Session[]): Promise<number> {
+    const merged = [...sessions.value]
+    let applied = 0
+    for (const session of imported) {
+      const index = merged.findIndex(s => s.id === session.id)
+      if (index === -1) {
+        merged.push(session)
+        applied++
+      } else if (compareSessions(session, merged[index]!) > 0) {
+        merged[index] = session
+        applied++
+      }
+    }
+    if (applied === 0) {
+      return 0
+    }
+    await replaceAllSessions(merged)
+    sessions.value = merged
     storageError.value = null
     broadcastDataReplaced()
     // The sync store watches this and schedules a run.
     mutationCount.value++
+    return applied
   }
 
   /**
