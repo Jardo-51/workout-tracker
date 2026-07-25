@@ -74,8 +74,8 @@
       <v-card-text>
         This deletes all {{ workoutCount }} workout(s) and their entries.
         <template v-if="sync.configured">
-          They go from your other synced devices too — log out first to clear
-          only this one.
+          They go from the sync server and your other devices too. To clear
+          only this device and keep the copy on the server, log out first.
         </template>
 
         <template v-else>
