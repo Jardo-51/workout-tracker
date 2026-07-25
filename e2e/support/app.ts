@@ -20,7 +20,9 @@ export interface Backup {
 
 export async function openApp (page: Page) {
   await page.goto('/')
-  await expect(page.getByRole('button', { name: 'Start workout' })).toBeVisible()
+  // Specifically the start button, not `openHome`'s either/or: a test opens the
+  // app on an empty device, where a session cannot already be under way.
+  await expect(startButton(page)).toBeVisible()
 }
 
 /**
@@ -77,8 +79,9 @@ export async function openSettings (page: Page) {
 
 /**
  * One entry card in the open session. Scoped to the card rather than matched on
- * text, because a closed Vuetify dialog stays mounted and its combobox still
- * holds the exercise name that was typed into it.
+ * text, because while the workout dialog is open its combobox holds the same
+ * exercise name and a plain text match would not say which of the two it means.
+ * (A *closed* dialog is not a second match: Vuetify 4 unmounts it outright.)
  */
 export function entryCard (page: Page, exercise: string) {
   return page.locator('.v-card.mb-2').filter({ hasText: exercise })
