@@ -40,9 +40,15 @@ async function navigate (page: Page, to: 'Home' | 'Settings') {
 /**
  * Home, waiting for whichever of its two shapes applies: the start button, or
  * the resume card that replaces it while a session is still open.
+ *
+ * The nav click is skipped when Home is already showing, because the only
+ * thing it would buy is `settle()` — and after a finished session that means
+ * idling out the *Workout finished* snackbar for no reason.
  */
 export async function openHome (page: Page) {
-  await navigate(page, 'Home')
+  if (new URL(page.url()).pathname !== '/') {
+    await navigate(page, 'Home')
+  }
   await expect(startButton(page).or(resumeCard(page))).toBeVisible()
 }
 
@@ -291,9 +297,11 @@ export async function startSession (page: Page) {
   await page.waitForURL(/\/session\//)
 }
 
+/** Finishes the open session. The app routes back to Home on its own. */
 export async function finishSession (page: Page) {
   await settle(page)
   await page.getByRole('button', { name: 'Finish' }).click()
+  await page.waitForURL(/\/$/)
   await openHome(page)
 }
 
