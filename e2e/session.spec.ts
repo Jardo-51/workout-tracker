@@ -185,16 +185,16 @@ test.describe('a workout session', () => {
     await fillWorkoutValues(page, { name: 'Squat' })
 
     await historyButton(page).click()
-    await expect(historyDialog(page)).toContainText('80 kg × 6 reps × 4 sets')
-    await expect(historyDialog(page)).toContainText('without tempo')
+    await expect(historyDialog(page, 'Squat')).toContainText('80 kg × 6 reps × 4 sets')
+    await expect(historyDialog(page, 'Squat')).toContainText('without tempo')
     // The toolbar's close button, back to the entry being added.
-    await historyDialog(page).locator('.v-toolbar').getByRole('button').first().click()
-    await expect(historyDialog(page)).toBeHidden()
+    await historyDialog(page, 'Squat').locator('.v-toolbar').getByRole('button').first().click()
+    await expect(historyDialog(page, 'Squat')).toBeHidden()
 
     // A name never used before has nothing to show.
     await fillWorkoutValues(page, { name: 'Farmer walk' })
     await historyButton(page).click()
-    await expect(historyDialog(page)).toContainText('First time doing this one')
+    await expect(historyDialog(page, 'Farmer walk')).toContainText('First time doing this one')
   })
 
   test('takes a note on the session, and keeps it', async ({ page }) => {

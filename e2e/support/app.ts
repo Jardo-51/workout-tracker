@@ -103,12 +103,13 @@ export function workoutDialog (page: Page) {
 }
 
 /**
- * The exercise-history dialog: whichever dialog on screen is not the workout
- * one, since the two are open together whenever history is reached from it.
+ * The exercise-history dialog for one exercise, picked out by the toolbar
+ * title only it has — the exercise's own name, where the workout dialog it
+ * opens over says *Add exercise* or *Edit exercise*.
  */
-export function historyDialog (page: Page) {
+export function historyDialog (page: Page, exercise: string) {
   return page.getByRole('dialog').filter({
-    hasNot: page.getByRole('combobox', { name: 'Exercise' }),
+    has: page.locator('.v-toolbar-title', { hasText: exercise }),
   })
 }
 
