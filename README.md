@@ -91,7 +91,13 @@ timestamp — for the same reason a single deleted session is: that is what
 carries the deletion to your other devices on the next sync. Deleting the rows
 outright would leave the server copies alone and the next sync would pull
 everything straight back. So on a synced account this clears the account, not
-just the device; log out first if you only want the local copy gone.
+just the device.
+
+Logging out first does not make it local-only, it only defers it. The
+tombstones stay on the device with a newer stamp than anything on the server,
+so logging back in on it pushes them and the account's data goes then. To clear
+one device and keep the account's data, log out and remove the app's site data
+(or uninstall the PWA) rather than using this button.
 
 ## Etesync Sync (optional)
 
