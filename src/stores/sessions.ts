@@ -325,7 +325,12 @@ export const useSessionsStore = defineStore('sessions', () => {
           dateKey: session.dateKey,
           startTime: session.startTime,
           entries: [],
-          updatedAt: nextUpdatedAt(session),
+          // A session that is already a tombstone keeps its stamp: the server
+          // has that deletion, and a fresh stamp would only push it again as
+          // an identical update, on every clear, for every session the user
+          // ever deleted. It is still stripped, because a delete leaves the
+          // entries on the tombstone for the undo and a clear should not.
+          updatedAt: session.deleted ? session.updatedAt : nextUpdatedAt(session),
           deleted: true,
         }))
       : []

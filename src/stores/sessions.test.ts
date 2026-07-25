@@ -75,6 +75,19 @@ describe('clearAllSessions', () => {
     expect(store.visibleSessions).toEqual([])
   })
 
+  it('strips a session that is already a tombstone without re-stamping it', async () => {
+    // A fresh stamp would push it again as an identical update, once per
+    // clear, for every session the user has ever deleted.
+    const deleted = { ...makeSession('a'), deleted: true }
+    const store = storeWith(deleted)
+
+    await store.clearAllSessions(true)
+
+    expect(store.sessions).toEqual([
+      { id: 'a', dateKey: '2026-07-07', startTime: 1000, entries: [], updatedAt: FUTURE, deleted: true },
+    ])
+  })
+
   it('removes the rows outright when it must not propagate', async () => {
     const store = storeWith(makeSession('a'))
 
