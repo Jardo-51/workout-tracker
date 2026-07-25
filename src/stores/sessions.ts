@@ -5,7 +5,9 @@ import { broadcastDataReplaced, broadcastSessionChanged, onDataReplaced, onSessi
 import {
   getAllSessions,
   getSession as getStoredSession,
+  getSyncMeta,
   putSession,
+  putSyncMeta,
   replaceAllSessions,
 } from '@/services/db'
 import { errorMessage } from '@/utils/error'
@@ -192,6 +194,30 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   /**
+   * Makes sure the sync engine will push these sessions, whatever their stamp.
+   *
+   * It pushes what is dirty, and dirty means `updatedAt > syncedUpdatedAt` —
+   * strictly. A session that won its collision on `compareSessions`' content
+   * tie-break keeps the stamp of the copy it replaced, so if that copy had been
+   * synced the two are equal, the session is not dirty, and the server keeps
+   * the content that lost. Nothing brings it back down either: the server's
+   * item is unchanged, so no stoken delta mentions it. The device would just
+   * quietly disagree with the account forever.
+   *
+   * Backdating what the server was last told by one is the same trick
+   * `syncSessions` uses when a local copy beats an incoming remote one, and it
+   * costs nothing when the session is dirty already, which is the usual case.
+   */
+  async function forceDirty (written: Session[]) {
+    for (const session of written) {
+      const meta = await getSyncMeta(session.id)
+      if (meta && meta.syncedUpdatedAt >= session.updatedAt) {
+        await putSyncMeta({ ...meta, syncedUpdatedAt: session.updatedAt - 1 })
+      }
+    }
+  }
+
+  /**
    * Restores a backup by merging it in: a session the file has and this device
    * does not is added, one both have is resolved by `compareSessions`, and one
    * only this device has is left alone. Nothing is ever deleted.
@@ -220,6 +246,9 @@ export const useSessionsStore = defineStore('sessions', () => {
    * carrying the older stamp would lose to it there and be wiped on the next
    * sync — restored on this device, gone again a few seconds later.
    *
+   * The sessions it writes are then run through `forceDirty`, so the merge's
+   * outcome reaches the server even where it did not move the stamp.
+   *
    * Unlike the other mutations, this one lets a failed write reject: the caller
    * awaits it and reports to the user, and nothing has been changed yet when
    * the DB write is the thing that failed.
@@ -230,7 +259,7 @@ export const useSessionsStore = defineStore('sessions', () => {
    */
   async function importSessions (imported: Session[]): Promise<number> {
     const merged = [...sessions.value]
-    let changed = 0
+    const written: Session[] = []
     let workouts = 0
     for (const session of imported) {
       const index = merged.findIndex(s => s.id === session.id)
@@ -244,14 +273,18 @@ export const useSessionsStore = defineStore('sessions', () => {
       } else {
         continue
       }
-      changed++
+      written.push(index === -1 ? session : merged[index]!)
       if (!session.deleted) {
         workouts++
       }
     }
-    if (changed === 0) {
+    if (written.length === 0) {
       return 0
     }
+    // Before the sessions themselves, so a rejection here leaves the import as
+    // a whole undone. The cost is a session that was not imported after all
+    // being re-pushed once, which the server ends up with the same either way.
+    await forceDirty(written)
     await replaceAllSessions(merged)
     sessions.value = merged
     storageError.value = null

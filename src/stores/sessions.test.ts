@@ -1,3 +1,4 @@
+import type { SessionSyncMeta } from '@/services/db'
 import type { Session } from '@/types/workout'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +12,8 @@ const db = vi.hoisted(() => ({
   putSession: vi.fn(() => Promise.resolve()),
   replaceAllSessions: vi.fn((_sessions: Session[]) => Promise.resolve()),
   clearSyncState: vi.fn(() => Promise.resolve()),
+  getSyncMeta: vi.fn((_id: string) => Promise.resolve<SessionSyncMeta | undefined>(undefined)),
+  putSyncMeta: vi.fn((_meta: SessionSyncMeta) => Promise.resolve()),
 }))
 const broadcast = vi.hoisted(() => ({
   broadcastSessionChanged: vi.fn(),
@@ -41,6 +44,10 @@ function makeSession (id = 'a'): Session {
 /** The bare shape a delete or a clear leaves behind. */
 function tombstoneFor (id: string, updatedAt: number): Session {
   return { id, dateKey: '2026-07-07', startTime: 1000, entries: [], updatedAt, deleted: true }
+}
+
+function syncMetaFor (sessionId: string, syncedUpdatedAt: number): SessionSyncMeta {
+  return { sessionId, itemUid: `${sessionId}-uid`, cache: new Uint8Array([1]), syncedUpdatedAt }
 }
 
 function storeWith (...sessions: Session[]) {
@@ -197,6 +204,28 @@ describe('importSessions', () => {
     await storeWith().importSessions([makeSession('a')])
 
     expect(db.clearSyncState).not.toHaveBeenCalled()
+  })
+
+  it('forces a tie-break winner dirty, so the sync engine still pushes it', async () => {
+    // Same stamp as the copy it replaced, and that copy was already synced, so
+    // `updatedAt > syncedUpdatedAt` is false and the push phase would skip it.
+    const local = { ...withStamp('a', 100), note: 'aaa' }
+    const fromFile = { ...withStamp('a', 100), note: 'zzz' }
+    db.getSyncMeta.mockResolvedValueOnce(syncMetaFor('a', 100))
+    const store = storeWith(local)
+
+    await store.importSessions([fromFile])
+
+    expect(db.putSyncMeta).toHaveBeenCalledWith(syncMetaFor('a', 99))
+  })
+
+  it('leaves the bookkeeping of a session that is dirty anyway alone', async () => {
+    db.getSyncMeta.mockResolvedValueOnce(syncMetaFor('a', 100))
+    const store = storeWith(withStamp('a', 100))
+
+    await store.importSessions([{ ...withStamp('a', 200), note: 'from the file' }])
+
+    expect(db.putSyncMeta).not.toHaveBeenCalled()
   })
 
   it('imports verbatim, without bumping updatedAt', async () => {
