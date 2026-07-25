@@ -5,7 +5,7 @@
     <v-card-text>
       <div class="text-body-2 text-medium-emphasis mb-4">
         Save every workout to a JSON file you keep yourself, or restore one.
-        Importing replaces the workouts on this device.
+        Importing replaces the workouts on this device<template v-if="sync.configured">, and the next sync then merges them with your account</template>.
       </div>
 
       <div class="d-flex ga-2">
@@ -57,6 +57,12 @@
       <v-card-text>
         This replaces the {{ workoutCount }} workout(s) on this device with the
         {{ pending.length }} in the file. It cannot be undone.
+
+        <template v-if="sync.configured">
+          The next sync then merges that with your account: the imported
+          workouts go to your other devices, and anything on the server that is
+          not in the file comes back here.
+        </template>
       </v-card-text>
 
       <v-card-actions>

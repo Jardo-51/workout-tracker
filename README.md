@@ -73,17 +73,20 @@ Settings → Backup exports every workout to a JSON file
 plain, readable JSON — a `sessions` array plus the timestamp it was written at —
 so it doubles as a way to get the data out of the app for good.
 
-Import **replaces** all workouts on the device rather than merging, and asks for
-confirmation before it does. The file is parsed and validated first: a session
-or entry this version cannot read aborts the whole import with the reason, since
-imported data is persisted and pushed to sync, where anything malformed would
-outlive the import.
+Import **replaces** all workouts on the device rather than merging them, and
+asks for confirmation before it does. The file is parsed and validated first: a
+session or entry this version cannot read aborts the whole import with the
+reason, since imported data is persisted and pushed to sync, where anything
+malformed would outlive the import.
 
 If sync is configured, importing also drops the local sync bookkeeping, so the
 next run re-pulls the collection in full and re-pushes every imported session.
-Restored sessions and what the server holds then converge under the usual
-last-write-wins rule — a restore is not a way to force old data over newer data
-already on the server.
+That makes the replacement local and momentary: the net effect on the account is
+a **merge**. The imported sessions reach the other devices, anything on the
+server that was not in the file comes back to this one, and a session that
+exists in both resolves under the usual last-write-wins rule — so a restore is
+neither a way to force old data over newer data on the server, nor a way to
+delete anything from the account. Use *Clear all workouts* for that.
 
 **Clear all workouts** deletes every session and the entries and notes on it.
 What it leaves behind depends on whether you are logged in to sync, and the
