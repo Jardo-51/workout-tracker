@@ -85,6 +85,14 @@ Restored sessions and what the server holds then converge under the usual
 last-write-wins rule — a restore is not a way to force old data over newer data
 already on the server.
 
+**Clear all workouts** deletes every session and the entries and notes on it.
+Each session is kept as a bare tombstone — no content, just an id and a
+timestamp — for the same reason a single deleted session is: that is what
+carries the deletion to your other devices on the next sync. Deleting the rows
+outright would leave the server copies alone and the next sync would pull
+everything straight back. So on a synced account this clears the account, not
+just the device; log out first if you only want the local copy gone.
+
 ## Etesync Sync (optional)
 
 Workout data can be synced across devices through an [Etesync](https://www.etesync.com/)

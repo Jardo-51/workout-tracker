@@ -215,6 +215,37 @@ export const useSessionsStore = defineStore('sessions', () => {
     mutationCount.value++
   }
 
+  /**
+   * Deletes every workout, reducing each session to a bare tombstone: the
+   * entries and the note — everything the user actually wrote — are dropped
+   * from disk rather than kept for an undo, which is the point of a button
+   * that says it clears your data.
+   *
+   * Tombstones rather than removed rows, because that is how a single deleted
+   * session already travels: sync bookkeeping is deliberately *not* cleared
+   * here, so each tombstone is pushed as an update to the item the server
+   * already holds and the deletion reaches the user's other devices. Dropping
+   * the rows outright would leave the server copies untouched, and the next
+   * sync would pull every workout straight back.
+   *
+   * Rejects on a failed write, like `importSessions`.
+   */
+  async function clearAllSessions () {
+    const cleared = sessions.value.map<Session>(session => ({
+      id: session.id,
+      dateKey: session.dateKey,
+      startTime: session.startTime,
+      entries: [],
+      updatedAt: nextUpdatedAt(session),
+      deleted: true,
+    }))
+    await replaceAllSessions(cleared)
+    sessions.value = cleared
+    storageError.value = null
+    broadcastDataReplaced()
+    mutationCount.value++
+  }
+
   async function startSession (): Promise<Session> {
     const now = Date.now()
     const session: Session = {
@@ -319,6 +350,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     load,
     upsertFromRemote,
     importSessions,
+    clearAllSessions,
     visibleSessions,
     activeSession,
     exerciseNames,

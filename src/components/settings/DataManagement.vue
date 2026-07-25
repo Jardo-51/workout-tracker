@@ -35,6 +35,18 @@
         type="file"
         @change="onFileChosen"
       >
+
+      <v-btn
+        block
+        class="mt-4"
+        color="error"
+        :disabled="workoutCount === 0"
+        prepend-icon="$deleteOutline"
+        variant="text"
+        @click="confirmClear = true"
+      >
+        Clear all workouts
+      </v-btn>
     </v-card-text>
   </v-card>
 
@@ -43,8 +55,8 @@
       <v-card-title>Import backup?</v-card-title>
 
       <v-card-text>
-        This replaces the {{ sessions.visibleSessions.length }} workout(s) on this
-        device with the {{ pending.length }} in the file. It cannot be undone.
+        This replaces the {{ workoutCount }} workout(s) on this device with the
+        {{ pending.length }} in the file. It cannot be undone.
       </v-card-text>
 
       <v-card-actions>
@@ -54,28 +66,57 @@
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="confirmClear" max-width="400">
+    <v-card>
+      <v-card-title>Clear all workouts?</v-card-title>
+
+      <v-card-text>
+        This deletes all {{ workoutCount }} workout(s) and their entries.
+        <template v-if="sync.configured">
+          They are removed from your other synced devices too.
+        </template>
+        It cannot be undone — export first if you want to keep a copy.
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+        <v-btn @click="confirmClear = false">Cancel</v-btn>
+        <v-btn color="error" :loading="clearing" @click="doClear">Delete everything</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script lang="ts" setup>
   import type { Session } from '@/types/workout'
-  import { ref, useTemplateRef } from 'vue'
+  import { computed, onMounted, ref, useTemplateRef } from 'vue'
   import { backupFileName, buildBackup, parseBackup } from '@/services/backup'
   import { useAppStore } from '@/stores/app'
   import { useSessionsStore } from '@/stores/sessions'
+  import { useSyncStore } from '@/stores/sync'
   import { errorMessage } from '@/utils/error'
 
   const sessions = useSessionsStore()
+  const sync = useSyncStore()
   const app = useAppStore()
 
   const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
   const confirmImport = ref(false)
   const importing = ref(false)
+  const confirmClear = ref(false)
+  const clearing = ref(false)
   /** Sessions read from the chosen file, held while the user confirms. */
   const pending = ref<Session[]>([])
 
+  const workoutCount = computed(() => sessions.visibleSessions.length)
+
+  // Settings is reachable directly on a cold start, so the sessions may not
+  // have been read yet — the counts and the Clear button need them.
+  onMounted(() => void sessions.load())
+
   async function doExport () {
-    // Settings is reachable directly on a cold start, so the sessions may not
-    // have been read yet.
+    // Guards the click that beats the load kicked off on mount.
     await sessions.load()
     // Tombstones are sync bookkeeping, not workouts — they would only show up
     // as junk in a file the user is meant to be able to read.
@@ -129,5 +170,19 @@
   function cancelImport () {
     confirmImport.value = false
     pending.value = []
+  }
+
+  async function doClear () {
+    clearing.value = true
+    const count = workoutCount.value
+    try {
+      await sessions.clearAllSessions()
+      app.showSnackbar(`Deleted ${count} workout(s)`)
+      confirmClear.value = false
+    } catch (error) {
+      app.showSnackbar(`Could not clear data: ${errorMessage(error)}`, 'error')
+    } finally {
+      clearing.value = false
+    }
   }
 </script>
