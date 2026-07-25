@@ -19,6 +19,9 @@ That shell exports `PLAYWRIGHT_BROWSERS_PATH` (at `playwright-driver.browsers`)
 and `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`. Outside it, a run fails with
 *"Executable doesn't exist"*.
 
+CI runs them the same way (`.github/workflows/e2e.yml`), so the binary being
+driven there is the one being driven here.
+
 Useful variations:
 
 ```sh

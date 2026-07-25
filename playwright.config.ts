@@ -7,7 +7,8 @@ const BASE_URL = `http://127.0.0.1:${PORT}`
 /**
  * End-to-end tests, run against the production build.
  *
- * This machine cannot run Playwright's own browsers, so they come from nix:
+ * This machine cannot run Playwright's own browsers, so they come from nix —
+ * and CI takes them from the same shell, so both drive the same binary:
  *
  *     nix develop .#playwright -c pnpm test:e2e
  *

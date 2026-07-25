@@ -1,9 +1,8 @@
 name: E2E
 
 # Separate from Build on purpose: Build gates every push and stays fast, while
-# this one pulls a browser, makes a production build and drives it. Pull
-# requests and main only — running it on every WIP commit is not worth the
-# minutes.
+# this one makes a production build and drives it in a browser. Pull requests
+# and main only — running it on every WIP commit is not worth the minutes.
 on:
   pull_request:
   push:
@@ -40,6 +39,18 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The browsers come from the playwright shell, so the whole store is
+      # worth keeping between runs. Keyed on the flake, which is what decides
+      # what is in it.
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-playwright-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          restore-prefixes-first-match: nix-playwright-${{ runner.os }}-
 
       - name: Cache pnpm store
         uses: actions/cache@v5
@@ -49,35 +60,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      # Playwright's own browsers, not the ones in the playwright nix shell:
-      # that shell exists for dev machines whose OS is too old to run them, and
-      # its browsers derivation is a large thing to fetch every run. The exact
-      # @playwright/test pin keeps this chromium and that one on the same
-      # revision.
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-
       - name: Install
         run: |
           nix develop --command bash -c "
             pnpm install --frozen-lockfile
-          "
-
-      # Deliberately without `--with-deps`: that path shells out to
-      # `sudo -- sh -c "apt-get update && apt-get install ..."`, with the job's
-      # environment dropped (no `sudo -E`) and stdio inherited, so anything apt
-      # asks — a needrestart prompt, a held lock — blocks with nothing to answer
-      # it and the step hangs until the job timeout. The runner image already
-      # carries the libraries chromium needs. If one ever goes missing, install
-      # it in its own explicitly non-interactive step rather than through here.
-      - name: Install browser
-        timeout-minutes: 5
-        run: |
-          nix develop --command bash -c "
-            pnpm exec playwright install chromium
           "
 
       - name: Wait for the Etesync server
@@ -92,16 +78,21 @@ jobs:
           echo "Etesync server did not come up" >&2
           exit 1
 
+      # Through the playwright shell, the same way the tests are run locally:
+      # it brings the browsers with it, pinned alongside the @playwright/test
+      # version, so CI and a dev machine drive the identical binary. Installing
+      # them here instead (`playwright install`) is what the first two attempts
+      # did, and both hung until the step timed out.
       - name: Test
         env:
           E2E_ETEBASE_URL: http://127.0.0.1:8033
         run: |
-          nix develop --command bash -c "
+          nix develop .#playwright --command bash -c "
             pnpm test:e2e
           "
 
       - name: Upload report
-        if: failure()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
