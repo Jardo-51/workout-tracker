@@ -220,7 +220,9 @@ export const useSessionsStore = defineStore('sessions', () => {
   /**
    * Restores a backup by merging it in: a session the file has and this device
    * does not is added, one both have is resolved by `compareSessions`, and one
-   * only this device has is left alone. Nothing is ever deleted.
+   * only this device has is left alone. A deletion travels with it — the file
+   * carries tombstones, so a workout deleted before the export was written is
+   * deleted here too — but a session the file says nothing about is untouched.
    *
    * Merging rather than replacing, because replacing was only ever a
    * replacement on a device with sync switched off. With sync on, the next run
