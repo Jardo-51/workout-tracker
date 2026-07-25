@@ -13,7 +13,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
 /** Shape of an export file, as `services/backup.ts` writes it. */
 export interface Backup {
   app: string
-  version: number
+  fileVersion: number
   exportedAt: string
   sessions: Session[]
 }

@@ -40,7 +40,7 @@ test.describe('backup, without sync', () => {
       /^workout-tracker-export-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.json$/,
     )
     // The markers parseBackup checks before it trusts anything else.
-    expect(backup).toMatchObject({ app: 'workout-tracker', version: 1 })
+    expect(backup).toMatchObject({ app: 'workout-tracker', fileVersion: 1 })
     expect(backup.exportedAt).toEqual(expect.any(String))
     // Both sessions: the file is a copy of the device, so the deleted one
     // travels as the tombstone that carries the deletion.
@@ -90,7 +90,7 @@ test.describe('backup, without sync', () => {
     const broken = testInfo.outputPath('broken.json')
     await fs.writeFile(broken, JSON.stringify({
       app: 'workout-tracker',
-      version: 1,
+      fileVersion: 1,
       sessions: [{ id: 'x', dateKey: '7. 7. 2026', startTime: 1, updatedAt: 1, entries: [] }],
     }))
     await chooseBackupFile(page, broken)

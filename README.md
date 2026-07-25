@@ -90,7 +90,7 @@ declared in `build.target` in `vite.config.mts`.
 Settings → Backup exports every workout to a JSON file
 (`workout-tracker-export-<date>_<time>.json`) and imports one back. The file is
 plain, readable JSON — a `sessions` array, the timestamp it was written at, and
-an `app`/`version` pair naming the format — so it doubles as a way to get the
+an `app`/`fileVersion` pair naming the format — so it doubles as a way to get the
 data out of the app for good. An import checks that pair first: without it a
 file is only recognisable by having something shaped like sessions in it, which
 another app's export could be too.
