@@ -26,6 +26,9 @@ pnpm build
 
 # Lint
 pnpm lint
+
+# Unit tests
+pnpm test
 ```
 
 Alternatively, if you use [Nix](https://nixos.org/), you can run commands via the project's dev shell:
@@ -33,6 +36,20 @@ Alternatively, if you use [Nix](https://nixos.org/), you can run commands via th
 ```bash
 nix develop -c pnpm dev
 ```
+
+### Tests
+
+`pnpm test` runs the unit tests (vitest, `src/**/*.test.ts`). The end-to-end
+tests drive the production build in a browser and need the *playwright* shell,
+which brings the browsers with it:
+
+```bash
+nix develop .#playwright -c pnpm test:e2e
+```
+
+The backup tests that involve sync skip themselves unless an Etesync server is
+configured — [`e2e/README.md`](e2e/README.md) has the one-line docker command
+and the environment variables.
 
 ## Project Structure
 
@@ -50,6 +67,8 @@ src/
 ├── plugins/         # Vuetify, Pinia, Router config
 ├── router/          # Route definitions
 └── main.ts          # App entry point
+
+e2e/                 # Playwright tests, driven against the production build
 ```
 
 ## Browser Support
