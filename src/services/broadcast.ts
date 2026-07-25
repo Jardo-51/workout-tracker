@@ -6,6 +6,12 @@ interface SessionChangedMessage {
   sessionId: string
 }
 
+interface DataReplacedMessage {
+  type: 'data-replaced'
+}
+
+type Message = SessionChangedMessage | DataReplacedMessage
+
 let channel: BroadcastChannel | undefined
 
 function getChannel (): BroadcastChannel | undefined {
@@ -17,15 +23,42 @@ function getChannel (): BroadcastChannel | undefined {
 
 /** Tells other tabs that this session's stored copy changed. */
 export function broadcastSessionChanged (sessionId: string): void {
-  getChannel()?.postMessage({ type: 'session-changed', sessionId } satisfies SessionChangedMessage)
+  getChannel()?.postMessage({ type: 'session-changed', sessionId } satisfies Message)
+}
+
+/**
+ * Tells other tabs that every session was swapped out at once (backup import).
+ * Sent instead of a per-session message because sessions the import *removed*
+ * have no id a peer could learn about, and a peer still holding one in memory
+ * would write it back on its next mutation.
+ */
+export function broadcastDataReplaced (): void {
+  getChannel()?.postMessage({ type: 'data-replaced' } satisfies Message)
 }
 
 /** Fires for changes made by *other* tabs; a tab never hears its own messages. */
 export function onSessionChanged (handler: (sessionId: string) => void): void {
-  getChannel()?.addEventListener('message', event => {
-    const message = event.data as SessionChangedMessage | undefined
-    if (message?.type === 'session-changed') {
+  onMessage(message => {
+    if (message.type === 'session-changed') {
       handler(message.sessionId)
+    }
+  })
+}
+
+/** As above, for a wholesale replacement of the stored sessions. */
+export function onDataReplaced (handler: () => void): void {
+  onMessage(message => {
+    if (message.type === 'data-replaced') {
+      handler()
+    }
+  })
+}
+
+function onMessage (handler: (message: Message) => void): void {
+  getChannel()?.addEventListener('message', event => {
+    const message = event.data as Message | undefined
+    if (message) {
+      handler(message)
     }
   })
 }

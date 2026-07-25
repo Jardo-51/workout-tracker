@@ -1,8 +1,14 @@
 import type { Session, SessionEntry, WorkoutEntry } from '@/types/workout'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { broadcastSessionChanged, onSessionChanged } from '@/services/broadcast'
-import { getAllSessions, getSession as getStoredSession, putSession } from '@/services/db'
+import { broadcastDataReplaced, broadcastSessionChanged, onDataReplaced, onSessionChanged } from '@/services/broadcast'
+import {
+  clearSyncState,
+  getAllSessions,
+  getSession as getStoredSession,
+  putSession,
+  replaceAllSessions,
+} from '@/services/db'
 import { errorMessage } from '@/utils/error'
 import { toDateKey } from '@/utils/format'
 
@@ -49,6 +55,12 @@ export const useSessionsStore = defineStore('sessions', () => {
     // Another tab writing the same IndexedDB would otherwise be invisible
     // here, and our stale copy would overwrite its work on the next persist.
     onSessionChanged(id => void reloadSession(id))
+    onDataReplaced(() => void reloadAllSessions())
+  }
+
+  /** Re-reads the whole store, dropping anything another tab removed. */
+  async function reloadAllSessions () {
+    sessions.value = await getAllSessions()
   }
 
   function load (): Promise<void> {
@@ -179,6 +191,30 @@ export const useSessionsStore = defineStore('sessions', () => {
     await store(session)
   }
 
+  /**
+   * Restores a backup: the imported sessions become the entire local set.
+   *
+   * Sync bookkeeping is dropped along with the old data. It records what the
+   * server has already seen per session, and an imported session whose
+   * `updatedAt` sits at or below that stamp would look clean and never be
+   * pushed — the restore would simply never leave the device. Clearing it also
+   * drops the stoken, so the next sync re-pulls the collection in full and the
+   * two sides converge under the usual last-write-wins rule.
+   *
+   * Unlike the other mutations, this one lets a failed write reject: the caller
+   * awaits it and reports to the user, and nothing has been changed yet when
+   * the DB write is the thing that failed.
+   */
+  async function importSessions (imported: Session[]) {
+    await replaceAllSessions(imported)
+    await clearSyncState()
+    sessions.value = imported
+    storageError.value = null
+    broadcastDataReplaced()
+    // The sync store watches this and schedules a run.
+    mutationCount.value++
+  }
+
   async function startSession (): Promise<Session> {
     const now = Date.now()
     const session: Session = {
@@ -282,6 +318,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     storageError,
     load,
     upsertFromRemote,
+    importSessions,
     visibleSessions,
     activeSession,
     exerciseNames,

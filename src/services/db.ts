@@ -70,6 +70,19 @@ export async function putSession (session: Session): Promise<void> {
   await db.put('sessions', toPlain(session))
 }
 
+/**
+ * Swaps the whole sessions store for `sessions` (backup import). One
+ * transaction, so a failure part-way leaves the previous contents intact
+ * rather than a half-restored mix of the two.
+ */
+export async function replaceAllSessions (sessions: Session[]): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction('sessions', 'readwrite')
+  await tx.store.clear()
+  await Promise.all(sessions.map(session => tx.store.put(toPlain(session))))
+  await tx.done
+}
+
 export async function getSyncMeta (sessionId: string): Promise<SessionSyncMeta | undefined> {
   const db = await getDB()
   return db.get('syncMeta', sessionId)

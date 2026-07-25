@@ -42,8 +42,8 @@ src/
 ├── components/
 │   ├── layout/      # Bottom navigation
 │   ├── session/     # Workout/break entry editors, history, steppers
-│   └── settings/    # Theme toggle, weight unit, Etesync sync
-├── services/        # IndexedDB, Etesync sync engine, cross-tab broadcast
+│   └── settings/    # Theme toggle, weight unit, Etesync sync, JSON backup
+├── services/        # IndexedDB, Etesync sync engine, cross-tab broadcast, backup format
 ├── stores/          # Pinia stores (app, sessions, sync)
 ├── utils/           # Formatting and error helpers
 ├── types/           # Shared TypeScript types
@@ -65,6 +65,25 @@ declared in `build.target` in `vite.config.mts`.
 - Full offline functionality via service worker caching
 - Auto-updates when a new version is deployed
 - No account required — your data stays on your device (IndexedDB)
+
+## Backup & Restore (JSON)
+
+Settings → Backup exports every workout to a JSON file
+(`workout-tracker-export-<date>_<time>.json`) and imports one back. The file is
+plain, readable JSON — a `sessions` array plus the timestamp it was written at —
+so it doubles as a way to get the data out of the app for good.
+
+Import **replaces** all workouts on the device rather than merging, and asks for
+confirmation before it does. The file is parsed and validated first: a session
+or entry this version cannot read aborts the whole import with the reason, since
+imported data is persisted and pushed to sync, where anything malformed would
+outlive the import.
+
+If sync is configured, importing also drops the local sync bookkeeping, so the
+next run re-pulls the collection in full and re-pushes every imported session.
+Restored sessions and what the server holds then converge under the usual
+last-write-wins rule — a restore is not a way to force old data over newer data
+already on the server.
 
 ## Etesync Sync (optional)
 
