@@ -176,7 +176,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
       const account_ = account
       const ran = await withSyncLock(() =>
-        api.syncSessions(account_, sessionsStore.sessions, sessionsStore.upsertFromRemote),
+        api.syncSessions(account_, () => sessionsStore.sessions, sessionsStore.upsertFromRemote),
       )
       if (!ran) {
         // Another tab is syncing the same account; its pulls reach us over the

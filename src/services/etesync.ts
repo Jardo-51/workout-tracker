@@ -182,10 +182,18 @@ async function decodeSession (item: Etebase.Item): Promise<Session | undefined> 
  * by `compareSessions`), then push every local session whose updatedAt is
  * newer than what the server has seen. Tombstoned sessions sync like any
  * other session, so deletions propagate.
+ *
+ * The local sessions arrive as a getter rather than an array, because a run
+ * spans many awaits and the store can be replaced wholesale under it: a backup
+ * import and `clearAllSessions` both install a new array. Holding the one we
+ * were handed would mean pulling remote items against sessions that are gone
+ * — writing them back into a store the clear had just emptied — and pushing
+ * pre-clear content over the tombstones meant to replace it. Reading it afresh
+ * makes the replacement visible to the rest of the run instead.
  */
 export async function syncSessions (
   account: Account,
-  localSessions: Session[],
+  localSessions: () => Session[],
   applyRemote: (session: Session) => Promise<void>,
 ): Promise<SyncResult> {
   const { collectionManager, collection } = await ensureCollection(account)
@@ -206,7 +214,7 @@ export async function syncSessions (
         skipped++
         continue
       }
-      const local = localSessions.find(s => s.id === remote.id)
+      const local = localSessions().find(s => s.id === remote.id)
       const order = local ? compareSessions(remote, local) : 1
       if (order > 0) {
         await applyRemote(remote)
@@ -231,7 +239,7 @@ export async function syncSessions (
 
   // Push
   const dirty: Array<{ session: Session, meta: Awaited<ReturnType<typeof getSyncMeta>> }> = []
-  for (const session of localSessions) {
+  for (const session of localSessions()) {
     const meta = await getSyncMeta(session.id)
     if (!meta || session.updatedAt > meta.syncedUpdatedAt) {
       dirty.push({ session, meta })
