@@ -73,7 +73,7 @@ test.describe('the home screen', () => {
       /Mar 2, 2026.*06:00/s,
       /Mar 1, 2026.*09:00/s,
     ])
-    await expect(sessionRow(page).last()).toContainText('1 exercises')
+    await expect(sessionRow(page, 'Mar 1, 2026')).toContainText('1 exercises')
   })
 
   test('keeps a session when the delete confirmation is cancelled', async ({ page }) => {
