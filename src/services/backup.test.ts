@@ -26,7 +26,12 @@ function makeSession (overrides: Partial<Session> = {}): Session {
 }
 
 function file (sessions: unknown[]): string {
-  return JSON.stringify({ sessions, exportedAt: '2026-07-07T10:00:00.000Z' })
+  return JSON.stringify({
+    app: 'workout-tracker',
+    version: 1,
+    sessions,
+    exportedAt: '2026-07-07T10:00:00.000Z',
+  })
 }
 
 describe('parseBackup', () => {
@@ -57,10 +62,16 @@ describe('parseBackup', () => {
   it.each([
     ['not JSON at all', 'nonsense', /valid JSON/],
     ['a JSON scalar', '42', /workout-tracker export/],
-    ['a missing sessions array', '{"exportedAt":"x"}', /sessions/],
-    ['sessions being an object', '{"sessions":{}}', /sessions/],
+    ['another app\'s file that happens to fit', '{"sessions":[]}', /workout-tracker export/],
+    ['a file from a newer format', '{"app":"workout-tracker","version":2,"sessions":[]}', /format 2/],
+    ['a missing sessions array', '{"app":"workout-tracker","version":1}', /sessions/],
+    ['sessions being an object', '{"app":"workout-tracker","version":1,"sessions":{}}', /sessions/],
   ])('rejects %s', (_name, text, expected) => {
     expect(() => parseBackup(text)).toThrow(expected)
+  })
+
+  it('marks the file with the app and the format version', () => {
+    expect(buildBackup([])).toMatchObject({ app: 'workout-tracker', version: 1 })
   })
 
   it.each([

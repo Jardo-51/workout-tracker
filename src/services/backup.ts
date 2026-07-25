@@ -1,14 +1,31 @@
 import type { BreakEntry, Session, SessionEntry, Tempo, WorkoutEntry } from '@/types/workout'
 import { toDateKey } from '@/utils/format'
 
+const APP = 'workout-tracker'
+/**
+ * Bump when the session shape changes in a way this parser could not read, and
+ * branch on it here. Without a marker, `parseBackup` has nothing to branch on
+ * and nothing to recognise its own files by: it would take any JSON object
+ * with a plausible `sessions` array, including one belonging to another app,
+ * and persist and sync whatever typechecked.
+ */
+const FORMAT_VERSION = 1
+
 /** Shape of an exported JSON file. */
 export interface Backup {
+  app: typeof APP
+  version: number
   sessions: Session[]
   exportedAt: string
 }
 
 export function buildBackup (sessions: Session[]): Backup {
-  return { sessions, exportedAt: new Date().toISOString() }
+  return {
+    app: APP,
+    version: FORMAT_VERSION,
+    sessions,
+    exportedAt: new Date().toISOString(),
+  }
 }
 
 export function backupFileName (now: number = Date.now()): string {
@@ -146,7 +163,15 @@ export function parseBackup (text: string): Session[] {
   if (!data || typeof data !== 'object') {
     return fail('not a workout-tracker export')
   }
-  const { sessions } = data as Record<string, unknown>
+  const { app, version, sessions } = data as Record<string, unknown>
+  if (app !== APP) {
+    return fail('not a workout-tracker export')
+  }
+  if (version !== FORMAT_VERSION) {
+    // Nothing sensible to do with it, but say which way it is wrong: a file
+    // from a newer version is a reason to update the app, not a broken file.
+    return fail(`written in format ${String(version)}, and this version reads ${FORMAT_VERSION}`)
+  }
   if (!Array.isArray(sessions)) {
     return fail('no "sessions" array found')
   }
