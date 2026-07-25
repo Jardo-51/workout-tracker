@@ -25,6 +25,7 @@ import {
   setDefaultWeightUnit,
   setSessionNote,
   snackbar,
+  startButton,
   startSession,
   stepper,
   workoutDialog,
@@ -226,6 +227,9 @@ test.describe('a workout session', () => {
 
     await finishSession(page)
     await expect(sessionRow(page)).toContainText('2 exercises')
-    await expect(page.getByText('In progress')).toBeHidden()
+    // Finished for the second time: Home offers to start a new session again
+    // rather than to resume this one. Asserted the positive way round — the
+    // resume card being hidden would also hold if it could never be there.
+    await expect(startButton(page)).toBeVisible()
   })
 })
