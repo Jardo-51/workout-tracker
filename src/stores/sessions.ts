@@ -216,29 +216,40 @@ export const useSessionsStore = defineStore('sessions', () => {
   }
 
   /**
-   * Deletes every workout, reducing each session to a bare tombstone: the
-   * entries and the note — everything the user actually wrote — are dropped
-   * from disk rather than kept for an undo, which is the point of a button
-   * that says it clears your data.
+   * Deletes every workout. Either way the entries and the note — everything
+   * the user actually wrote — go, rather than being kept for an undo, which is
+   * the point of a button that says it clears your data.
    *
-   * Tombstones rather than removed rows, because that is how a single deleted
-   * session already travels: sync bookkeeping is deliberately *not* cleared
-   * here, so each tombstone is pushed as an update to the item the server
-   * already holds and the deletion reaches the user's other devices. Dropping
-   * the rows outright would leave the server copies untouched, and the next
-   * sync would pull every workout straight back.
+   * `propagate` picks what is left behind, and the caller sets it from whether
+   * sync is configured:
+   *
+   * - `true`: each session becomes a bare tombstone, the way a single deleted
+   *   session already travels. Sync bookkeeping is deliberately *not* cleared,
+   *   so each tombstone is pushed as an update to the item the server already
+   *   holds and the deletion reaches the user's other devices. Dropping the
+   *   rows here instead would leave the server copies untouched, and the next
+   *   sync would pull every workout straight back.
+   *
+   * - `false`: the rows go too, leaving nothing on the device. Tombstones
+   *   would outlive a logged-out clear and carry a stamp newer than anything
+   *   on the server, so logging back in later would push them and delete the
+   *   account's data then — turning "clear this device" into "clear the
+   *   account", just deferred. Logging in again re-pulls the account's
+   *   workouts, which is the same thing any other fresh device does.
    *
    * Rejects on a failed write, like `importSessions`.
    */
-  async function clearAllSessions () {
-    const cleared = sessions.value.map<Session>(session => ({
-      id: session.id,
-      dateKey: session.dateKey,
-      startTime: session.startTime,
-      entries: [],
-      updatedAt: nextUpdatedAt(session),
-      deleted: true,
-    }))
+  async function clearAllSessions (propagate: boolean) {
+    const cleared = propagate
+      ? sessions.value.map<Session>(session => ({
+          id: session.id,
+          dateKey: session.dateKey,
+          startTime: session.startTime,
+          entries: [],
+          updatedAt: nextUpdatedAt(session),
+          deleted: true,
+        }))
+      : []
     await replaceAllSessions(cleared)
     sessions.value = cleared
     storageError.value = null

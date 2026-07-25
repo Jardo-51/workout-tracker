@@ -74,7 +74,12 @@
       <v-card-text>
         This deletes all {{ workoutCount }} workout(s) and their entries.
         <template v-if="sync.configured">
-          They are removed from your other synced devices too.
+          They go from your other synced devices too — log out first to clear
+          only this one.
+        </template>
+
+        <template v-else>
+          Nothing is left behind on this device.
         </template>
         It cannot be undone — export first if you want to keep a copy.
       </v-card-text>
@@ -176,7 +181,9 @@
     clearing.value = true
     const count = workoutCount.value
     try {
-      await sessions.clearAllSessions()
+      // Logged in, the clear is meant to reach the account; logged out, it is
+      // meant to leave nothing here that a later login could push.
+      await sessions.clearAllSessions(sync.configured)
       app.showSnackbar(`Deleted ${count} workout(s)`)
       confirmClear.value = false
     } catch (error) {

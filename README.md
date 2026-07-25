@@ -86,18 +86,22 @@ last-write-wins rule — a restore is not a way to force old data over newer dat
 already on the server.
 
 **Clear all workouts** deletes every session and the entries and notes on it.
-Each session is kept as a bare tombstone — no content, just an id and a
-timestamp — for the same reason a single deleted session is: that is what
-carries the deletion to your other devices on the next sync. Deleting the rows
-outright would leave the server copies alone and the next sync would pull
-everything straight back. So on a synced account this clears the account, not
-just the device.
+What it leaves behind depends on whether you are logged in to sync, and the
+confirmation dialog says which one you are about to get:
 
-Logging out first does not make it local-only, it only defers it. The
-tombstones stay on the device with a newer stamp than anything on the server,
-so logging back in on it pushes them and the account's data goes then. To clear
-one device and keep the account's data, log out and remove the app's site data
-(or uninstall the PWA) rather than using this button.
+- **Logged in**, each session is kept as a bare tombstone — no content, just an
+  id and a timestamp — for the same reason a single deleted session is: that is
+  what carries the deletion to your other devices on the next sync. Removing the
+  rows outright would leave the server copies alone and the next sync would pull
+  everything straight back. So this clears the account, not just the device.
+- **Logged out**, the rows go too and nothing is left. Tombstones would outlive
+  the clear carrying a stamp newer than anything on the server, so logging back
+  in later would push them and take the account's data with them — a device
+  clear turning into an account clear, just deferred. Logging in again re-pulls
+  the account's workouts the way any other fresh device does.
+
+So log out first if you want to clear this device and keep what is on the
+server.
 
 ## Etesync Sync (optional)
 
