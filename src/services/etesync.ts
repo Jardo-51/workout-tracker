@@ -130,6 +130,10 @@ export interface SyncResult {
  * fields something actually dereferences are required — `name` is read for
  * workout entries, and `id` keys the render loop — so an entry of a kind a
  * future version adds still travels through this one intact.
+ *
+ * `backup.ts` has a namesake that checks a known kind's every field, since a
+ * file can arrive hand-edited. The two agree on this part on purpose: an entry
+ * that syncs in has to be one an export can carry back out.
  */
 function isSessionEntry (value: unknown): value is SessionEntry {
   if (typeof value !== 'object' || value === null) {

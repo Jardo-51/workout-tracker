@@ -85,8 +85,16 @@ describe('parseBackup', () => {
     expect(() => parseBackup(text)).toThrow(/index 1/)
   })
 
+  it('accepts an entry of a kind it does not know, the way sync does', () => {
+    // A newer version's entry travels through etesync.ts intact, so a device
+    // can hold one; the file must not be the one channel that cannot carry it.
+    const entries = [workoutEntry(), { id: 'e2', kind: 'stretch', seconds: 30 }]
+    const text = file([{ ...makeSession(), entries }])
+
+    expect(parseBackup(text)[0]!.entries).toEqual(entries)
+  })
+
   it.each([
-    ['an unknown kind', { kind: 'stretch' }],
     ['a missing id', { id: undefined }],
     ['a missing name', { name: undefined }],
     ['a non-numeric weight', { weight: '100' }],

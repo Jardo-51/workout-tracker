@@ -44,6 +44,19 @@ function isBreakEntry (o: Record<string, unknown>): o is BreakEntry & Record<str
   return isFiniteNum(o.durationSec)
 }
 
+/**
+ * There is a second `isSessionEntry` in `etesync.ts`, and the difference is
+ * deliberate: that one checks only what something dereferences, this one checks
+ * every field of the kinds it knows, because a file is written by a human's
+ * filesystem and can arrive edited or truncated in ways a sync item cannot.
+ *
+ * What they must agree on is which entries get through at all. A kind a future
+ * version adds travels over sync intact, so a device on the newer version can
+ * hold an entry this one has no rules for — and it would be perverse for the
+ * file to be the one channel that could not carry it, aborting the import of a
+ * whole backup over an entry that syncs in fine. So an unknown kind passes on
+ * its id alone, exactly as it does over the wire.
+ */
 function isSessionEntry (value: unknown): value is SessionEntry {
   if (!value || typeof value !== 'object') {
     return false
@@ -58,7 +71,7 @@ function isSessionEntry (value: unknown): value is SessionEntry {
   if (o.kind === 'break') {
     return isBreakEntry(o)
   }
-  return false
+  return true
 }
 
 /**
