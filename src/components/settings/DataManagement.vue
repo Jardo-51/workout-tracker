@@ -75,7 +75,8 @@
         This deletes all {{ workoutCount }} workout(s) and their entries.
         <template v-if="sync.configured">
           They go from the sync server and your other devices too. To clear
-          only this device and keep the copy on the server, log out first.
+          only this device and keep the copy on the server, log out under
+          Etesync sync above first.
         </template>
 
         <template v-else>
