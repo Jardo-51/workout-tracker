@@ -331,9 +331,10 @@ export async function setDefaultWeightUnit (page: Page, unit: WeightUnit) {
 /** Deletes the workout at the top of the Home list, confirming the dialog. */
 export async function deleteNewestWorkout (page: Page) {
   await openHome(page)
-  await page.locator('.v-list-item').first().getByRole('button').click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
+  await sessionRow(page).first().getByRole('button').click()
+  const confirm = confirmCard(page, 'Delete session?')
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(confirm).toBeHidden()
 }
 
 /** Every row in IndexedDB, tombstones included. */
