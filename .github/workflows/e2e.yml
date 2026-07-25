@@ -1,0 +1,103 @@
+name: E2E
+
+# Separate from Build on purpose: Build gates every push and stays fast, while
+# this one pulls a browser, makes a production build and drives it. Pull
+# requests and main only — running it on every WIP commit is not worth the
+# minutes.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # The sync tests want a real Etesync server; without one they skip
+    # themselves, and the case that loses a restore on a synced account would
+    # go unchecked. A fresh container per run means a clean account.
+    services:
+      etesync:
+        image: victorrds/etesync:alpine
+        ports:
+          - 8033:3735
+        env:
+          SUPER_USER: gymrat
+          SUPER_PASS: correct-horse-battery
+          # The image's default wildcard makes starlette's TrustedHostMiddleware
+          # answer 500 to everything.
+          ALLOWED_HOSTS: 127.0.0.1,localhost
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      # Playwright's own browsers, not the ones in the playwright nix shell:
+      # that shell exists for dev machines whose OS is too old to run them, and
+      # its browsers derivation is a large thing to fetch every run. The exact
+      # @playwright/test pin keeps this chromium and that one on the same
+      # revision.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install
+        run: |
+          nix develop --command bash -c "
+            pnpm install --frozen-lockfile
+          "
+
+      - name: Install browser
+        run: |
+          nix develop --command bash -c "
+            pnpm exec playwright install --with-deps chromium
+          "
+
+      - name: Wait for the Etesync server
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8033/api/v1/authentication/is_etebase/ > /dev/null; then
+              echo "server is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Etesync server did not come up" >&2
+          exit 1
+
+      - name: Test
+        env:
+          E2E_ETEBASE_URL: http://127.0.0.1:8033
+        run: |
+          nix develop --command bash -c "
+            pnpm test:e2e
+          "
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
