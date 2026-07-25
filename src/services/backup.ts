@@ -44,21 +44,31 @@ function isFiniteNum (value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * For the fields that count something — reps, sets, seconds. Half a set and
+ * minus five reps are not values the app can produce or the UI can show
+ * sensibly, and an import is the one door they could come in by.
+ */
+function isCount (value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 function isTempo (value: unknown): value is Tempo {
-  return Array.isArray(value) && value.length === 4 && value.every(isFiniteNum)
+  return Array.isArray(value) && value.length === 4 && value.every(isCount)
 }
 
 function isWorkoutEntry (o: Record<string, unknown>): o is WorkoutEntry & Record<string, unknown> {
   return isString(o.name)
-    && isFiniteNum(o.reps)
-    && isFiniteNum(o.weight)
+    && isCount(o.reps)
+    // Not a count: half-kilo plates are ordinary. Still not negative.
+    && isFiniteNum(o.weight) && o.weight >= 0
     && (o.weightUnit === 'kg' || o.weightUnit === 'lbs')
-    && isFiniteNum(o.sets)
+    && isCount(o.sets)
     && (o.tempo === undefined || isTempo(o.tempo))
 }
 
 function isBreakEntry (o: Record<string, unknown>): o is BreakEntry & Record<string, unknown> {
-  return isFiniteNum(o.durationSec)
+  return isCount(o.durationSec)
 }
 
 /**

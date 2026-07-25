@@ -109,8 +109,12 @@ describe('parseBackup', () => {
     ['a missing id', { id: undefined }],
     ['a missing name', { name: undefined }],
     ['a non-numeric weight', { weight: '100' }],
+    ['a negative weight', { weight: -100 }],
     ['an unknown weight unit', { weightUnit: 'stone' }],
     ['a three-part tempo', { tempo: [2, 0, 2] }],
+    ['a fractional tempo', { tempo: [2, 0, 1.5, 0] }],
+    ['negative reps', { reps: -5 }],
+    ['a fractional set count', { sets: 0.5 }],
   ])('rejects an entry with %s', (_name, overrides) => {
     const entry: Record<string, unknown> = { ...workoutEntry(), id: 'e2', ...overrides }
     for (const [key, value] of Object.entries(overrides)) {
@@ -125,6 +129,18 @@ describe('parseBackup', () => {
   it('rejects a break entry without a duration', () => {
     const text = file([{ ...makeSession(), entries: [{ id: 'e1', kind: 'break' }] }])
     expect(() => parseBackup(text)).toThrow(/invalid entry at index 0/)
+  })
+
+  it('rejects a break of negative length', () => {
+    const text = file([{ ...makeSession(), entries: [{ id: 'e1', kind: 'break', durationSec: -90 }] }])
+    expect(() => parseBackup(text)).toThrow(/invalid entry at index 0/)
+  })
+
+  it('accepts a fractional weight, which the app itself produces', () => {
+    const entries = [{ ...workoutEntry(), weight: 62.5 }]
+    const text = file([{ ...makeSession(), entries }])
+
+    expect(parseBackup(text)[0]!.entries).toEqual(entries)
   })
 
   it('rejects duplicate entry ids, which the UI cannot tell apart', () => {
