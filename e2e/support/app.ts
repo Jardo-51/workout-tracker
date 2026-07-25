@@ -54,9 +54,13 @@ export function resumeCard (page: Page) {
   return page.locator('.v-card').filter({ hasText: 'Resume workout' })
 }
 
-/** A row in Home's *Previous sessions* list. */
+/**
+ * A row in Home's *Previous sessions* list. Scoped to that card, because
+ * `v-list-item` is also what a combobox menu and the history dialog are built
+ * out of — page-wide it would count those too.
+ */
 export function sessionRow (page: Page, text?: string | RegExp) {
-  const rows = page.locator('.v-list-item')
+  const rows = page.locator('.past-sessions .v-list-item')
   return text === undefined ? rows : rows.filter({ hasText: text })
 }
 
