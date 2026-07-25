@@ -149,8 +149,15 @@
     const link = document.createElement('a')
     link.href = url
     link.download = backupFileName()
+    // In the document because some engines ignore a click on a detached
+    // anchor, and the revoke deferred because only Chrome reliably starts the
+    // fetch during the click itself — revoking synchronously cancels the
+    // download elsewhere, and the snackbar below would then report a file that
+    // was never written.
+    document.body.append(link)
     link.click()
-    URL.revokeObjectURL(url)
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
     app.showSnackbar(`Exported ${workoutCount.value} workout(s)`)
   }
 
