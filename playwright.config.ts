@@ -50,9 +50,16 @@ export default defineConfig({
   // The built app, not the dev server: the service worker, the lazy route
   // chunks and the minified bundle are all part of what is being checked.
   webServer: {
-    command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
+    // `--host 127.0.0.1` rather than vite's default: it otherwise binds
+    // `localhost`, which on the CI runners resolves to ::1 first, and the
+    // wait below polls IPv4 and never gets an answer.
+    command: `pnpm build && pnpm preview --port ${PORT} --strictPort --host 127.0.0.1`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    // Not silenced: when the wait does time out, the server's own output is
+    // the only thing that says whether it ever came up.
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 })
