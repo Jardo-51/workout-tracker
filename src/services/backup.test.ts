@@ -101,7 +101,7 @@ describe('parseBackup', () => {
     ['an unknown weight unit', { weightUnit: 'stone' }],
     ['a three-part tempo', { tempo: [2, 0, 2] }],
   ])('rejects an entry with %s', (_name, overrides) => {
-    const entry: Record<string, unknown> = { ...workoutEntry(), ...overrides }
+    const entry: Record<string, unknown> = { ...workoutEntry(), id: 'e2', ...overrides }
     for (const [key, value] of Object.entries(overrides)) {
       if (value === undefined) {
         delete entry[key]
@@ -114,6 +114,13 @@ describe('parseBackup', () => {
   it('rejects a break entry without a duration', () => {
     const text = file([{ ...makeSession(), entries: [{ id: 'e1', kind: 'break' }] }])
     expect(() => parseBackup(text)).toThrow(/invalid entry at index 0/)
+  })
+
+  it('rejects duplicate entry ids, which the UI cannot tell apart', () => {
+    const entries = [workoutEntry(), { ...workoutEntry(), reps: 8 }]
+    const text = file([{ ...makeSession(), entries }])
+
+    expect(() => parseBackup(text)).toThrow(/entry at index 1 repeats id e1/)
   })
 
   it('rejects duplicate session ids, which would silently collapse on import', () => {

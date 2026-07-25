@@ -108,9 +108,20 @@ function sessionProblem (value: unknown): string | undefined {
   if (!Array.isArray(o.entries)) {
     return 'entries is not an array'
   }
-  const badEntry = o.entries.findIndex(entry => !isSessionEntry(entry))
-  if (badEntry !== -1) {
-    return `invalid entry at index ${badEntry}`
+  const entryIds = new Set<string>()
+  for (const [index, entry] of o.entries.entries()) {
+    if (!isSessionEntry(entry)) {
+      return `invalid entry at index ${index}`
+    }
+    // An id is what updateEntry and removeEntry key on, and what the render
+    // loop uses. Repeat one and the user gets an entry whose edits land on its
+    // twin and that cannot be deleted on its own — malformed data outliving
+    // the import, which is the thing this module is for. Same reason the
+    // session ids below are checked.
+    if (entryIds.has(entry.id)) {
+      return `entry at index ${index} repeats id ${entry.id}`
+    }
+    entryIds.add(entry.id)
   }
   return undefined
 }
