@@ -148,7 +148,7 @@ export function stepper (page: Page, label: string) {
 }
 
 /** One of `TempoInput`'s four columns: down, hold, up, hold. */
-export function tempoColumn (page: Page, index: number) {
+function tempoColumn (page: Page, index: number) {
   const column = workoutDialog(page).locator('.v-col--cols-3').nth(index)
   return {
     value: column.locator('.text-h5'),
@@ -253,7 +253,7 @@ export async function saveEntry (page: Page) {
 }
 
 /** Opens the break sheet from the action bar. */
-export async function openBreakSheet (page: Page) {
+async function openBreakSheet (page: Page) {
   await settle(page)
   await page.getByRole('button', { name: 'Break', exact: true }).click()
   const sheet = breakSheet(page)
