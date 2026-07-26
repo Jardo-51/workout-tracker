@@ -1,10 +1,13 @@
 {
   "extends": "@tsconfig/node22/tsconfig.json",
-  // The app's type file comes along so a test that reads a session out of
-  // IndexedDB is held to the same shape the app writes. It cannot come in as a
-  // project reference: tsconfig.app.json disables emit, which a referenced
+  // Two app files come along, for the same reason in both cases: a test that
+  // reads IndexedDB should be held to what the app actually writes, rather
+  // than to a copy of it. `workout.ts` is the shape of a stored session;
+  // `db.constants.ts` is the prefix a logout clears out of the `meta` store,
+  // which a test asserting that it is gone has to name. Neither can come in as
+  // a project reference: tsconfig.app.json disables emit, which a referenced
   // project may not do.
-  "include": ["e2e/**/*", "src/types/workout.ts"],
+  "include": ["e2e/**/*", "src/types/workout.ts", "src/services/db.constants.ts"],
   "compilerOptions": {
     "composite": true,
     "noEmit": true,

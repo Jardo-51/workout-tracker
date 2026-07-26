@@ -1,8 +1,8 @@
 import type { Browser, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import {
-  clearAllWorkouts,
   confirmClear,
+  emptyTheAccount,
   exportBackup,
   importBackup,
   logIn,
@@ -46,7 +46,8 @@ test.describe('backup, with sync', () => {
     await recordWorkout(deviceA, 'Squat')
     await recordWorkout(deviceA, 'Deadlift')
     await syncNow(deviceA)
-    expect(await visibleSessions(deviceA)).toHaveLength(2)
+    const recorded = await visibleSessions(deviceA)
+    expect(recorded).toHaveLength(2)
 
     await logIn(deviceB, account!)
     await syncNow(deviceB)
@@ -60,10 +61,20 @@ test.describe('backup, with sync', () => {
     await confirmClear(dialog)
     // Logged in the rows stay as bare tombstones: that is what pushes the
     // deletion, where removing them would leave the server copies to come back.
+    //
+    // Asked of the two sessions this test recorded rather than of a row count,
+    // because a clear leaves its tombstones on the server for good: the account
+    // outlives the run, `emptyTheAccount` above is itself a clear, and every
+    // tombstone any of that ever left is pulled back down by the login. Only
+    // the *live* rows are known to be this test's alone.
     const cleared = await storedSessions(deviceA)
-    expect(cleared).toHaveLength(2)
-    expect(cleared.every(session => session.deleted)).toBe(true)
-    expect(cleared.every(session => session.entries.length === 0)).toBe(true)
+    expect(cleared.filter(session => !session.deleted)).toHaveLength(0)
+    for (const { id } of recorded) {
+      const row = cleared.find(session => session.id === id)
+      expect(row, `session ${id} should still be a row`).toBeDefined()
+      expect(row!.deleted).toBe(true)
+      expect(row!.entries).toHaveLength(0)
+    }
 
     await syncNow(deviceA)
     await syncNow(deviceB)
@@ -101,13 +112,4 @@ async function openDevice (browser: Browser): Promise<Page> {
   const page = await context.newPage()
   await openApp(page)
   return page
-}
-
-/** Leaves the account with no workouts in it, whatever a previous run left. */
-async function emptyTheAccount (page: Page) {
-  await syncNow(page)
-  if ((await visibleSessions(page)).length > 0) {
-    await clearAllWorkouts(page)
-    await syncNow(page)
-  }
 }

@@ -139,7 +139,20 @@
   }
 
   async function doLogout () {
-    await sync.logout()
-    app.showSnackbar('Sync disabled — data stays on this device')
+    try {
+      await sync.logout()
+    } catch (error) {
+      // Nothing the user can act on: `logout()` drops the saved session, the
+      // stored account and the sync state before it asks the server to forget
+      // the session token, and that last call is the only part that reaches
+      // the network. Sync is off either way by the time this runs.
+      console.warn('[sync] the server was not told about the logout', error)
+    } finally {
+      // Shown whatever happened. Without this the one failure mode that is
+      // possible here — the server unreachable — left the user with no message
+      // at all, in front of a card that had already gone back to the login
+      // form, with no way to tell a finished logout from a stuck one.
+      app.showSnackbar('Sync disabled — data stays on this device')
+    }
   }
 </script>

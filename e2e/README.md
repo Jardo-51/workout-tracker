@@ -49,10 +49,15 @@ used through: recording, editing and removing entries and breaks in a session,
 and what Home shows for each of the states it can be in. Between them they are
 the only tests that render most of `components/session/`.
 
+`settings.spec.ts` covers the Settings cards that are not Backup: the theme and
+default-unit preferences, which live in localStorage and so are really a test
+of what survives a reload, and the sync card's login and logout.
+
 `backup.spec.ts` runs on a device with sync switched off and needs nothing but
 the app. `sync-backup.spec.ts` drives two browser contexts as two devices
 against a real Etesync server, and **skips itself** unless one is configured —
-so the default run stays self-contained.
+so the default run stays self-contained. The account half of `settings.spec.ts`
+skips on the same condition; the rest of that file always runs.
 
 The synced tests are worth the setup: with sync on, *Clear all workouts* leaves
 tombstones that reach the account, and a restore has to beat them on both
@@ -87,12 +92,26 @@ is in it — the app's own *Clear all workouts*, which is also the thing being
 tested. A run therefore empties the account it is pointed at: use a throwaway
 one, never an account with real workouts in it.
 
+It also carries over between *specs*: more than one file logs into it now, they
+run in file order under a single worker, and whichever runs first leaves its
+sessions there. So a spec that uses the account must start by emptying it
+(`emptyTheAccount`), and must not assert on totals of what came back from the
+server — not row counts, not tombstone counts. A clear leaves its tombstones on
+the account permanently and a login pulls every one of them down, so a total
+only holds on an account nothing has ever been cleared from. Assert about the
+sessions the test itself made, by id.
+
 ## Conventions
 
-- Drive the app the way a user does: bottom nav, buttons, dialogs. The one
-  exception is `storedSessions`, which reads IndexedDB, because "a tombstone or
-  no row at all" is exactly what several of these tests are about and it is
-  invisible on screen.
+- Drive the app the way a user does: bottom nav, buttons, dialogs. Three
+  helpers are allowed past that, for one reason: what is *left on the device*
+  is exactly what those tests are about, and none of it shows on screen.
+  `storedSessions` reads the rows, because "a tombstone or no row at all" is
+  the difference several tests turn on; `storedKeys` and `storedSyncState` read
+  localStorage and the sync bookkeeping, because what a logout leaves behind is
+  what a later login would push at whatever account it is then given. A fourth
+  needs the same kind of argument — that the thing asserted on has no visible
+  form — not merely that reaching in is easier.
 - Assert with `expect`, which retries. No sleeps: waiting for a sync means
   waiting for the button to stop loading, not for four seconds to pass.
 - Snackbars sit over the bottom nav and swallow clicks aimed at it — the

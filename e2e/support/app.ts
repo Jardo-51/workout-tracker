@@ -4,10 +4,14 @@ import { expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * Driving the app the way a user does: the bottom nav, the buttons, the
- * dialogs. Nothing here reaches into the app's internals except
- * {@link storedSessions}, which reads IndexedDB because "what is actually on
- * the device" is the thing several of these tests are about — the difference
- * between a tombstone and a removed row is invisible on screen.
+ * dialogs. Three helpers reach into the app's internals, all for the same
+ * reason — "what is actually on the device" is the thing those tests are about,
+ * and it has no visible form: {@link storedSessions}, because the difference
+ * between a tombstone and a removed row is invisible on screen, and
+ * {@link storedKeys} and {@link storedSyncState}, because what a logout leaves
+ * behind is what a later login would push at whatever account it is given.
+ *
+ * A fourth wants that same argument, not just convenience.
  */
 
 /** Shape of an export file, as `services/backup.ts` writes it. */
@@ -353,9 +357,39 @@ export async function openSession (page: Page, text: string | RegExp) {
 export async function setDefaultWeightUnit (page: Page, unit: WeightUnit) {
   await openSettings(page)
   await settle(page)
-  const button = page.getByRole('button', { name: unit, exact: true })
-  await button.click()
-  await expect(button).toHaveClass(/v-btn--active/)
+  await weightUnitButton(page, unit).click()
+  await expect(weightUnitButton(page, unit)).toHaveClass(/v-btn--active/)
+}
+
+/** One side of the Units card's toggle; `v-btn--active` marks the chosen one. */
+export function weightUnitButton (page: Page, unit: WeightUnit) {
+  return page.getByRole('button', { name: unit, exact: true })
+}
+
+/** The Appearance card's switch. Its own label is what the user reads. */
+export function darkModeSwitch (page: Page) {
+  return page.getByLabel('Dark mode')
+}
+
+/**
+ * The element Vuetify hangs the active theme off, as `v-theme--dark` or
+ * `v-theme--light` — the one place the choice is observable from outside.
+ */
+export function appRoot (page: Page) {
+  return page.locator('.v-application')
+}
+
+/** The colour the browser paints its own chrome with, kept in step by App.vue. */
+export function themeColor (page: Page): Promise<string | null> {
+  return page.locator('meta[name="theme-color"]').getAttribute('content')
+}
+
+/** Turns dark mode on or off from the Appearance card. */
+export async function setDarkMode (page: Page, dark: boolean) {
+  await openSettings(page)
+  await settle(page)
+  await darkModeSwitch(page).setChecked(dark)
+  await expect(appRoot(page)).toHaveClass(dark ? /v-theme--dark/ : /v-theme--light/)
 }
 
 /** Deletes the workout at the top of the Home list, confirming the dialog. */
@@ -367,20 +401,46 @@ export async function deleteNewestWorkout (page: Page) {
   await expect(confirm).toBeHidden()
 }
 
-/** Every row in IndexedDB, tombstones included. */
-export function storedSessions (page: Page): Promise<Session[]> {
-  return page.evaluate(async () => {
+/**
+ * Empties the named object stores of the app's database, in one transaction —
+ * either their rows or just their keys, one array per store in the order asked.
+ *
+ * What to read is passed as data rather than as a callback because
+ * `page.evaluate` ships the function to the browser as source: it closes over
+ * nothing, so anything a caller wanted to reuse — the request-to-promise
+ * wrapping, the open, the `close()` — would have to be written out again inside
+ * every caller's own callback.
+ */
+function readDb (
+  page: Page,
+  stores: string[],
+  read: 'getAll' | 'getAllKeys',
+): Promise<unknown[][]> {
+  return page.evaluate(async ({ read, stores }) => {
     const settled = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
       request.addEventListener('success', () => resolve(request.result))
       request.addEventListener('error', () => reject(request.error))
     })
     const db = await settled(indexedDB.open('workout-tracker'))
     try {
-      return await settled(db.transaction('sessions').objectStore('sessions').getAll()) as Session[]
+      const tx = db.transaction(stores)
+      return await Promise.all(stores.map(async name => {
+        const store = tx.objectStore(name)
+        // Branched rather than picking the method first: the two requests
+        // resolve to different types, and a union of them is not an
+        // `IDBRequest` of anything.
+        return read === 'getAll' ? await settled(store.getAll()) : await settled(store.getAllKeys())
+      }))
     } finally {
       db.close()
     }
-  })
+  }, { read, stores })
+}
+
+/** Every row in IndexedDB, tombstones included. */
+export async function storedSessions (page: Page): Promise<Session[]> {
+  const [sessions] = await readDb(page, ['sessions'], 'getAll')
+  return sessions as Session[]
 }
 
 export async function visibleSessions (page: Page): Promise<Session[]> {
@@ -450,7 +510,39 @@ export async function confirmClear (dialog: Locator) {
   await expect(dialog).toBeHidden()
 }
 
-export async function logIn (
+/**
+ * The Etesync sync card, which is the login form or the account, never both.
+ *
+ * Matched on its own title rather than on the text anywhere in the card: the
+ * *Clear all workouts?* dialog names the card while sync is on, so a plain
+ * text match resolves to two cards for as long as that dialog is mounted —
+ * which outlasts `confirmClear`, whose `toBeHidden()` is satisfied by the
+ * leave transition having started.
+ */
+export function etesyncCard (page: Page) {
+  return page.locator('.v-card').filter({
+    has: page.locator('.v-card-title', { hasText: 'Etesync sync' }),
+  })
+}
+
+/**
+ * Whatever the login form is complaining about, if anything.
+ *
+ * Inside the form specifically. The card holds a second alert when logged in —
+ * the sync store's own last error — and while the two can never be up at once,
+ * an unscoped `.v-alert` would let a test that thinks it is reading a rejected
+ * login quietly assert on a failed sync instead.
+ */
+export function loginError (page: Page) {
+  return etesyncCard(page).locator('form .v-alert')
+}
+
+/**
+ * Fills the login form and submits it, without waiting for an outcome — which
+ * is the point: the tests that want a *failed* login have no "Syncing as" to
+ * wait for, only the form's own error.
+ */
+export async function submitLogin (
   page: Page,
   account: { url: string, username: string, password: string },
 ) {
@@ -459,6 +551,13 @@ export async function logIn (
   await page.getByLabel('Username').fill(account.username)
   await page.getByLabel('Password').fill(account.password)
   await page.getByRole('button', { name: 'Log in & sync' }).click()
+}
+
+export async function logIn (
+  page: Page,
+  account: { url: string, username: string, password: string },
+) {
+  await submitLogin(page, account)
   await expect(page.getByText(`Syncing as ${account.username}`)).toBeVisible({ timeout: 60_000 })
   // The login runs a first sync; let it finish before anything else starts one.
   await expect(page.getByRole('button', { name: 'Sync now' })).not.toHaveClass(
@@ -473,4 +572,64 @@ export async function syncNow (page: Page) {
   const button = page.getByRole('button', { name: 'Sync now' })
   await button.click()
   await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+}
+
+/**
+ * Leaves the logged-in account with no workouts in it, whatever a previous run
+ * left. Clearing is the app's own way of emptying it, which is what makes a
+ * run against a long-lived test account repeatable.
+ */
+export async function emptyTheAccount (page: Page) {
+  await syncNow(page)
+  if ((await visibleSessions(page)).length > 0) {
+    await clearAllWorkouts(page)
+    await syncNow(page)
+  }
+}
+
+/**
+ * Logs out and waits for the store to have finished doing it.
+ *
+ * The message is the wait, not the form coming back: `logout()` drops the
+ * saved session first — which is what re-renders the card — and only then
+ * waits out a sync that is already running, clears the sync state out of
+ * IndexedDB and tells the server. The snackbar is shown after all of that, so
+ * it is the one point from which the leftovers can be read without racing the
+ * clearing of them.
+ */
+export async function logOut (page: Page) {
+  await openSettings(page)
+  await settle(page)
+  await page.getByRole('button', { name: 'Log out' }).click()
+  await expect(snackbar(page)).toHaveText(
+    'Sync disabled — data stays on this device',
+    { timeout: 60_000 },
+  )
+}
+
+/**
+ * Every key in localStorage, sorted — which is where the account lives.
+ *
+ * Deliberately unfiltered. What a refused login, or a logout, must leave
+ * behind is *nothing that was not already there*, and a helper that filtered
+ * to `etesync.*` could only ever say "nothing starts with the prefix this test
+ * picked" — a statement that stays true, and green, if the app renames its
+ * keys. Comparing the whole of localStorage against a snapshot taken before
+ * the login says what is meant without knowing any key names at all.
+ */
+export function storedKeys (page: Page): Promise<string[]> {
+  return page.evaluate(() => Object.keys(localStorage).toSorted())
+}
+
+/**
+ * The sync bookkeeping in IndexedDB — the per-session etebase caches, and the
+ * sync service's own keys in the shared `meta` store. What a logout leaves
+ * behind here is what a later login would push at the account.
+ */
+export async function storedSyncState (page: Page): Promise<{ syncMeta: string[], meta: string[] }> {
+  const [syncMeta, meta] = await readDb(page, ['syncMeta', 'meta'], 'getAllKeys')
+  return {
+    syncMeta: syncMeta.map(String).toSorted(),
+    meta: meta.map(String).toSorted(),
+  }
 }
