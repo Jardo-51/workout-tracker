@@ -23,12 +23,18 @@
           {{ app.snackbarAction.label }}
         </v-btn>
 
-        <!-- Only when there is nothing else in here. Next to an Undo this
+        <!-- Only when there is nothing else in here: next to an Undo this
              would be a small target beside the one thing the user still wants,
              and a mis-tap would take the undo away for good — the timeout is
-             the whole window they get. -->
+             the whole window they get.
+
+             And only while the message is up. Every way of closing clears the
+             action, while VSnackbar keeps its content mounted and merely
+             `v-show`s it through the leave transition — so without that second
+             condition the Undo just tapped would turn into a ✕ under the
+             finger for the length of the fade. -->
         <v-btn
-          v-else
+          v-else-if="app.snackbar"
           aria-label="Close"
           icon="$close"
           size="small"
