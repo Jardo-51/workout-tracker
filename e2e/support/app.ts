@@ -41,6 +41,12 @@ export async function openApp (page: Page) {
  * button that has gone holds on until the test itself times out. Whatever the
  * click does not manage, the wait below covers.
  *
+ * The `isVisible()` guard in front of it is what keeps that bound off the
+ * common path. Most calls here find no snackbar at all — the helpers call
+ * `settle()` before navigating whether or not anything is showing — and going
+ * straight to the click makes every one of those pay the timeout in full,
+ * which across a run costs more than the waiting this function exists to skip.
+ *
  * A message offering an undo deliberately has no close button, so that one is
  * still waited out — and its 6 s window is why the wait here is longer than
  * that, rather than the 5 s it used to be, which could expire first and hand
@@ -48,9 +54,10 @@ export async function openApp (page: Page) {
  */
 export async function settle (page: Page) {
   const snack = page.locator('.v-snackbar--active').first()
-  await snack.getByRole('button', { name: 'Close' })
-    .click({ timeout: 1000 })
-    .catch(() => {})
+  const close = snack.getByRole('button', { name: 'Close' })
+  if (await close.isVisible()) {
+    await close.click({ timeout: 1000 }).catch(() => {})
+  }
   await snack.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {})
 }
 
