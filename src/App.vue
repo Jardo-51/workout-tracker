@@ -76,10 +76,13 @@
   }
 
   /**
-   * Closes the snackbar from this side, which Vuetify gives no other way of
-   * doing: VSnackbar renders its overlay `persistent`, so Escape does not close
-   * it, and it does not forward `closeOnContentClick` either — without the
-   * button in the actions slot a message can only be waited out.
+   * Closes the snackbar from this side, which nothing Vuetify offers can do
+   * for us: VSnackbar renders its overlay `persistent`, so Escape does not
+   * close it, and it has no swipe support. The one dismissal it does forward,
+   * `closeOnContentClick`, takes a tap anywhere in the message — the Undo
+   * button included — and shows nothing to say the message can be dismissed at
+   * all. A button in the actions slot is what can be given to some messages
+   * and withheld from others.
    *
    * Clearing the action here is not a duplicate of {@link onSnackbarToggle}:
    * that fires on `update:model-value`, which Vuetify emits when it closes
