@@ -26,12 +26,39 @@ export async function openApp (page: Page) {
 }
 
 /**
- * Snackbars sit over the bottom of the screen, where the nav is, and swallow
- * the clicks aimed at it. Resolves immediately when none is showing.
+ * Snackbars sit over the bottom of the screen, where the nav and the session
+ * action bar are, and swallow the clicks aimed at them. Resolves immediately
+ * when none is showing.
+ *
+ * Dismissed rather than waited out where that is possible: the message would
+ * otherwise stay up for its full timeout and a suite that finishes a session in
+ * most of its tests spends that idling. The close button is the same one a user
+ * has.
+ *
+ * That click is best-effort — bounded, and its failure swallowed — because the
+ * message can expire under it: finding the button says nothing about it still
+ * being there when the click lands, and an unbounded click left waiting for a
+ * button that has gone holds on until the test itself times out. Whatever the
+ * click does not manage, the wait below covers.
+ *
+ * The `isVisible()` guard in front of it is what keeps that bound off the
+ * common path. Most calls here find no snackbar at all — the helpers call
+ * `settle()` before navigating whether or not anything is showing — and going
+ * straight to the click makes every one of those pay the timeout in full,
+ * which across a run costs more than the waiting this function exists to skip.
+ *
+ * A message offering an undo deliberately has no close button, so that one is
+ * still waited out — and its 6 s window is why the wait here is longer than
+ * that, rather than the 5 s it used to be, which could expire first and hand
+ * back a screen still covered by the snackbar.
  */
 export async function settle (page: Page) {
   const snack = page.locator('.v-snackbar--active').first()
-  await snack.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+  const close = snack.getByRole('button', { name: 'Close' })
+  if (await close.isVisible()) {
+    await close.click({ timeout: 1000 }).catch(() => {})
+  }
+  await snack.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {})
 }
 
 async function navigate (page: Page, to: 'Home' | 'Settings') {

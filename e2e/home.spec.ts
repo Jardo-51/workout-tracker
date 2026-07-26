@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import {
   addExercise,
   confirmCard,
+  deleteNewestWorkout,
   entryCard,
   openApp,
   openHome,
@@ -93,5 +94,31 @@ test.describe('the home screen', () => {
     await sessionRow(page).first().getByRole('button').click()
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(sessionRow(page)).toHaveCount(0)
+  })
+
+  test('lets a plain message be closed, but keeps an undo out of reach of it', async ({ page }) => {
+    await startSession(page)
+    await addExercise(page, 'Squat')
+
+    // Finishing says so and offers nothing else, so it can be got rid of.
+    await page.getByRole('button', { name: 'Finish' }).click()
+    const message = page.locator('.v-snackbar--active')
+    await expect(message).toContainText('Workout finished')
+    await message.getByRole('button', { name: 'Close' }).click()
+    await expect(message).toBeHidden()
+
+    await deleteNewestWorkout(page)
+
+    // Deleting offers an Undo, and then has no close button beside it: a
+    // mis-tap there would take the only way back with it.
+    await expect(message).toContainText('Session deleted')
+    await expect(message.getByRole('button', { name: 'Undo' })).toBeVisible()
+    // Counted, not asserted hidden: `.v-snackbar--active` stops matching the
+    // moment the message goes, so "no Close button" would also be true of a
+    // screen with no message on it — and a slow run could pass on that.
+    await expect(message.locator('.v-snackbar__actions button')).toHaveCount(1)
+
+    await message.getByRole('button', { name: 'Undo' }).click()
+    await expect(sessionRow(page)).toHaveCount(1)
   })
 })
