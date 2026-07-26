@@ -36,7 +36,9 @@
     <template v-if="pastSessions.length > 0">
       <div class="text-subtitle-2 text-medium-emphasis mb-2">Previous sessions</div>
 
-      <v-card>
+      <!-- `past-sessions` is what the e2e helpers scope a session row to; the
+           app renders `v-list-item` in dialogs and menus as well. -->
+      <v-card class="past-sessions">
         <v-list lines="two">
           <v-list-item
             v-for="session in pastSessions"

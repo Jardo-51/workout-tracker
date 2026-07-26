@@ -11,6 +11,7 @@ import {
   openClearDialog,
   openHome,
   recordWorkout,
+  sessionRow,
   snackbar,
   storedSessions,
   visibleSessions,
@@ -66,7 +67,7 @@ test.describe('backup, without sync', () => {
     await expect(snackbar(page)).toHaveText('Imported 1 workout(s)')
     expect(await visibleSessions(page)).toEqual(backup.sessions.filter(s => !s.deleted))
     await openHome(page)
-    await expect(page.locator('.v-list-item')).toHaveCount(1)
+    await expect(sessionRow(page)).toHaveCount(1)
   })
 
   test('merges into what is already there, without deleting it', async ({ page }, testInfo) => {

@@ -42,7 +42,12 @@ nix eval --raw 'github:NixOS/nixpkgs/nixos-26.05#playwright-driver.version'
 pnpm add -D @playwright/test@<that version>
 ```
 
-## The two suites
+## The suites
+
+`session.spec.ts` and `home.spec.ts` cover the two screens the app is actually
+used through: recording, editing and removing entries and breaks in a session,
+and what Home shows for each of the states it can be in. Between them they are
+the only tests that render most of `components/session/`.
 
 `backup.spec.ts` runs on a device with sync switched off and needs nothing but
 the app. `sync-backup.spec.ts` drives two browser contexts as two devices
