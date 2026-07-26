@@ -113,7 +113,10 @@ test.describe('the home screen', () => {
     // mis-tap there would take the only way back with it.
     await expect(message).toContainText('Session deleted')
     await expect(message.getByRole('button', { name: 'Undo' })).toBeVisible()
-    await expect(message.getByRole('button', { name: 'Close' })).toBeHidden()
+    // Counted, not asserted hidden: `.v-snackbar--active` stops matching the
+    // moment the message goes, so "no Close button" would also be true of a
+    // screen with no message on it — and a slow run could pass on that.
+    await expect(message.locator('.v-snackbar__actions button')).toHaveCount(1)
 
     await message.getByRole('button', { name: 'Undo' }).click()
     await expect(sessionRow(page)).toHaveCount(1)
