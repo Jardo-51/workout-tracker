@@ -480,9 +480,19 @@ export async function confirmClear (dialog: Locator) {
   await expect(dialog).toBeHidden()
 }
 
-/** The Etesync sync card, which is the login form or the account, never both. */
+/**
+ * The Etesync sync card, which is the login form or the account, never both.
+ *
+ * Matched on its own title rather than on the text anywhere in the card: the
+ * *Clear all workouts?* dialog names the card while sync is on, so a plain
+ * text match resolves to two cards for as long as that dialog is mounted —
+ * which outlasts `confirmClear`, whose `toBeHidden()` is satisfied by the
+ * leave transition having started.
+ */
 export function etesyncCard (page: Page) {
-  return page.locator('.v-card').filter({ hasText: 'Etesync sync' })
+  return page.locator('.v-card').filter({
+    has: page.locator('.v-card-title', { hasText: 'Etesync sync' }),
+  })
 }
 
 /** Whatever the login form is complaining about, if anything. */
