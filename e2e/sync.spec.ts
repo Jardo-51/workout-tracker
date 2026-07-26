@@ -58,6 +58,9 @@ test.describe('sync between two devices', () => {
 
     await recordWorkout(deviceB, 'Overhead press', { weight: 40, reps: 6 })
     const [recorded] = await visibleSessions(deviceB)
+    // Pinned here rather than left to `recorded!.id` further down, where a
+    // workout that was never recorded reads as a broken tombstone check.
+    expect(recorded, 'the workout should have been recorded on B').toBeDefined()
     await syncNow(deviceB)
     await syncNow(deviceA)
 
@@ -142,6 +145,9 @@ test.describe('sync between two devices', () => {
     await deviceA.context().setOffline(true)
     await recordWorkout(deviceA, 'Pull-up', { reps: 8 })
     const [recorded] = await visibleSessions(deviceA)
+    // Same reason as above: without this the poll at the end of the test is
+    // what fails, on an id that was never there to be pushed.
+    expect(recorded, 'the workout should have been recorded on A').toBeDefined()
 
     // Asking for a sync while offline says so rather than failing quietly, and
     // `syncNow` bails before the network: there is no error on the card to
