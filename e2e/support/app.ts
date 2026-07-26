@@ -525,9 +525,16 @@ export function etesyncCard (page: Page) {
   })
 }
 
-/** Whatever the login form is complaining about, if anything. */
+/**
+ * Whatever the login form is complaining about, if anything.
+ *
+ * Inside the form specifically. The card holds a second alert when logged in —
+ * the sync store's own last error — and while the two can never be up at once,
+ * an unscoped `.v-alert` would let a test that thinks it is reading a rejected
+ * login quietly assert on a failed sync instead.
+ */
 export function loginError (page: Page) {
-  return etesyncCard(page).locator('.v-alert')
+  return etesyncCard(page).locator('form .v-alert')
 }
 
 /**
