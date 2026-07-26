@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { SYNC_META_PREFIX } from '../src/services/db.constants'
 import {
   addExercise,
   appRoot,
@@ -18,7 +19,7 @@ import {
   setDarkMode,
   setDefaultWeightUnit,
   startSession,
-  storedSyncKeys,
+  storedKeys,
   storedSyncState,
   submitLogin,
   syncNow,
@@ -82,6 +83,8 @@ test.describe('settings', () => {
   })
 
   test('says why a login to a server that is not there failed', async ({ page }) => {
+    const keysBeforeLogin = await storedKeys(page)
+
     // A closed port on loopback, so the failure is an immediate refusal rather
     // than a DNS lookup that a machine with a hijacking resolver might answer.
     await submitLogin(page, {
@@ -99,7 +102,7 @@ test.describe('settings', () => {
     await expect(submit).toBeVisible()
     await expect(submit).not.toHaveClass(/v-btn--loading/)
     await expect(etesyncCard(page).getByRole('button', { name: 'Sync now' })).toBeHidden()
-    expect(await storedSyncKeys(page)).toEqual([])
+    expect(await storedKeys(page)).toEqual(keysBeforeLogin)
 
     // And the app is not stuck on the failure — it is still a workout tracker.
     await recordWorkout(page, 'Squat')
@@ -126,18 +129,20 @@ test.describe('settings, with sync', () => {
   })
 
   test('refuses a wrong password, and takes the right one afterwards', async ({ page }) => {
+    const keysBeforeLogin = await storedKeys(page)
     await submitLogin(page, { ...account!, password: `${account!.password}-wrong` })
 
     await expect(loginError(page)).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('button', { name: 'Log in & sync' })).toBeVisible()
-    expect(await storedSyncKeys(page)).toEqual([])
+    expect(await storedKeys(page)).toEqual(keysBeforeLogin)
 
     // The form is left usable, not wedged in its error state.
     await logIn(page, account!)
-    expect(await storedSyncKeys(page)).toContain('etesync.session')
+    expect(await storedKeys(page)).toContain('etesync.session')
   })
 
   test('logs out, keeping the workouts and dropping the sync bookkeeping', async ({ page }) => {
+    const keysBeforeLogin = await storedKeys(page)
     await logIn(page, account!)
     // The account outlives the run, so start from empty — otherwise the row
     // count below is whatever a previous test happened to leave up there.
@@ -152,20 +157,22 @@ test.describe('settings, with sync', () => {
     // account has ever been left with, and each of those is a row too.
     const synced = await storedSyncState(page)
     expect(synced.syncMeta.length).toBeGreaterThan(0)
-    expect(synced.meta.filter(key => key.startsWith('etesync.')).length).toBeGreaterThan(0)
-    expect(await storedSyncKeys(page)).toContain('etesync.session')
+    expect(synced.meta.filter(key => key.startsWith(SYNC_META_PREFIX)).length).toBeGreaterThan(0)
+    expect(await storedKeys(page)).toContain('etesync.session')
 
     await logOut(page)
 
     await expect(etesyncCard(page).getByRole('button', { name: 'Log in & sync' })).toBeVisible()
-    expect(await storedSyncKeys(page)).toEqual([])
+    // Not "no etesync keys": localStorage is back to what it was before the
+    // login, whatever the app chooses to call the things it saves.
+    expect(await storedKeys(page)).toEqual(keysBeforeLogin)
 
     // What is left in IndexedDB is what a later login would push at whatever
     // account it is given, so none of it may survive: a stale item cache
     // belongs to a collection the next account does not have.
     const afterLogout = await storedSyncState(page)
     expect(afterLogout.syncMeta).toEqual([])
-    expect(afterLogout.meta.filter(key => key.startsWith('etesync.'))).toEqual([])
+    expect(afterLogout.meta.filter(key => key.startsWith(SYNC_META_PREFIX))).toEqual([])
 
     // The workouts are the one thing a logout is not allowed to take —
     // "data stays on this device" is what the app promises as it does it.

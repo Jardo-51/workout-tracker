@@ -570,11 +570,18 @@ export async function logOut (page: Page) {
   )
 }
 
-/** The `etesync.*` keys of localStorage, which is where the account lives. */
-export function storedSyncKeys (page: Page): Promise<string[]> {
-  return page.evaluate(() =>
-    Object.keys(localStorage).filter(key => key.startsWith('etesync.')).toSorted(),
-  )
+/**
+ * Every key in localStorage, sorted — which is where the account lives.
+ *
+ * Deliberately unfiltered. What a refused login, or a logout, must leave
+ * behind is *nothing that was not already there*, and a helper that filtered
+ * to `etesync.*` could only ever say "nothing starts with the prefix this test
+ * picked" — a statement that stays true, and green, if the app renames its
+ * keys. Comparing the whole of localStorage against a snapshot taken before
+ * the login says what is meant without knowing any key names at all.
+ */
+export function storedKeys (page: Page): Promise<string[]> {
+  return page.evaluate(() => Object.keys(localStorage).toSorted())
 }
 
 /**
