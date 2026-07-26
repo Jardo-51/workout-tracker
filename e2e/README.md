@@ -97,4 +97,7 @@ one, never an account with real workouts in it.
   waiting for the button to stop loading, not for four seconds to pass.
 - Snackbars sit over the bottom nav and swallow clicks aimed at it — the
   helpers call `settle()` before navigating, which returns at once when there
-  is no snackbar up.
+  is no snackbar up. Where there is one, it clicks the message's Close button
+  rather than waiting the timeout out, which is most of why a suite run is
+  faster than it was; only a message offering an Undo has no close button and
+  still has to be waited out.
