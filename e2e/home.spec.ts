@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import {
   addExercise,
   confirmCard,
+  deleteNewestWorkout,
   entryCard,
   openApp,
   openHome,
@@ -106,10 +107,7 @@ test.describe('the home screen', () => {
     await message.getByRole('button', { name: 'Close' }).click()
     await expect(message).toBeHidden()
 
-    await openHome(page)
-    await sessionRow(page).first().getByRole('button').click()
-    const confirm = confirmCard(page, 'Delete session?')
-    await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
+    await deleteNewestWorkout(page)
 
     // Deleting offers an Undo, and then has no close button beside it: a
     // mis-tap there would take the only way back with it.
