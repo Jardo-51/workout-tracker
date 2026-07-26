@@ -53,12 +53,18 @@ the only tests that render most of `components/session/`.
 default-unit preferences, which live in localStorage and so are really a test
 of what survives a reload, and the sync card's login and logout.
 
+`multi-tab.spec.ts` is the one file about two *tabs* rather than two devices:
+two pages in one context, sharing an IndexedDB, which is what
+`services/broadcast.ts` exists for. A write in one tab showing up in the other
+and a clear or an import emptying and refilling it need no server; the third
+test, that a tab already syncing stops another from starting, does.
+
 `backup.spec.ts` runs on a device with sync switched off and needs nothing but
 the app. `sync.spec.ts` and `sync-backup.spec.ts` drive two browser contexts as
 two devices against a real Etesync server, and **skip themselves** unless one is
 configured — so the default run stays self-contained. The account half of
-`settings.spec.ts` skips on the same condition; the rest of that file always
-runs.
+`settings.spec.ts` and the sync-lock half of `multi-tab.spec.ts` skip on the
+same condition; the rest of those files always runs.
 
 The two synced files split by what they are about. `sync.spec.ts` is sync
 itself: a session and then its deletion travelling from one device to the
@@ -111,15 +117,16 @@ sessions the test itself made, by id.
 
 ## Conventions
 
-- Drive the app the way a user does: bottom nav, buttons, dialogs. Three
-  helpers are allowed past that, for one reason: what is *left on the device*
-  is exactly what those tests are about, and none of it shows on screen.
-  `storedSessions` reads the rows, because "a tombstone or no row at all" is
-  the difference several tests turn on; `storedKeys` and `storedSyncState` read
-  localStorage and the sync bookkeeping, because what a logout leaves behind is
-  what a later login would push at whatever account it is then given. A fourth
-  needs the same kind of argument — that the thing asserted on has no visible
-  form — not merely that reaching in is easier.
+- Drive the app the way a user does: bottom nav, buttons, dialogs. Four
+  helpers are allowed past that, for one reason: what those tests are about has
+  no form on screen. `storedSessions` reads the rows, because "a tombstone or
+  no row at all" is the difference several tests turn on; `storedKeys` and
+  `storedSyncState` read localStorage and the sync bookkeeping, because what a
+  logout leaves behind is what a later login would push at whatever account it
+  is then given; `holdSyncLock` takes the app's own Web Lock, because "another
+  tab is syncing" is invisible *and* untimeable — a run against a local server
+  is over in milliseconds, so a second tab has no window to be caught in. A
+  fifth needs the same kind of argument, not merely that reaching in is easier.
 - Assert with `expect`, which retries. No sleeps: waiting for a sync means
   waiting for the button to stop loading, not for four seconds to pass.
 - Snackbars sit over the bottom nav and swallow clicks aimed at it — the
