@@ -699,15 +699,23 @@ type LockHolder = Window & { releaseSyncLock?: () => void }
  * Resolves once the lock is actually held, which means waiting out a sync that
  * is already running; the {@link SYNC_LOCK} name is imported so the app and
  * this cannot drift apart.
+ *
+ * A rejected request is forwarded rather than dropped — `withSyncLock` in
+ * `services/broadcast.ts` guards for `navigator.locks` being missing at all,
+ * and a `SecurityError` is the other way this can fail. Left as `void`, either
+ * would hang here until the test's own 180 s ran out and report itself as
+ * *"Test timeout exceeded"*, which says nothing about locks. The `catch` costs
+ * nothing on the happy path: by the time the lock is released the promise below
+ * has long since settled at `granted()`.
  */
 export async function holdSyncLock (page: Page) {
   await page.evaluate(
-    name => new Promise<void>(granted => {
-      void navigator.locks.request(name, () => new Promise<void>(release => {
+    name => new Promise<void>((granted, failed) => {
+      navigator.locks.request(name, () => new Promise<void>(release => {
         const holder = window as LockHolder
         holder.releaseSyncLock = release
         granted()
-      }))
+      })).catch(failed)
     }),
     SYNC_LOCK,
   )
