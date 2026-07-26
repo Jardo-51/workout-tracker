@@ -14,10 +14,27 @@
     >
       {{ app.snackbarText }}
 
-      <template v-if="app.snackbarAction" #actions>
-        <v-btn variant="text" @click="runSnackbarAction">
+      <template #actions>
+        <v-btn
+          v-if="app.snackbarAction"
+          variant="text"
+          @click="runSnackbarAction"
+        >
           {{ app.snackbarAction.label }}
         </v-btn>
+
+        <!-- Only when there is nothing else in here. Next to an Undo this
+             would be a small target beside the one thing the user still wants,
+             and a mis-tap would take the undo away for good — the timeout is
+             the whole window they get. -->
+        <v-btn
+          v-else
+          aria-label="Close"
+          icon="$close"
+          size="small"
+          variant="text"
+          @click="dismissSnackbar"
+        />
       </template>
     </v-snackbar>
   </v-app>
@@ -49,12 +66,29 @@
 
   function runSnackbarAction () {
     app.snackbarAction?.handler()
-    app.snackbar = false
+    dismissSnackbar()
   }
 
-  // Clear the action whenever the snackbar closes (action click, timeout, or
-  // swipe) so a stale handler closing over an old session id can't fire again
-  // if the snackbar is ever re-shown without going through showSnackbar.
+  /**
+   * Closes the snackbar from this side, which Vuetify gives no other way of
+   * doing: VSnackbar renders its overlay `persistent`, so Escape does not close
+   * it, and it does not forward `closeOnContentClick` either — without the
+   * button in the actions slot a message can only be waited out.
+   *
+   * Clearing the action here is not a duplicate of {@link onSnackbarToggle}:
+   * that fires on `update:model-value`, which Vuetify emits when it closes
+   * *itself*, not when the model is set from out here.
+   */
+  function dismissSnackbar () {
+    app.snackbar = false
+    app.snackbarAction = null
+  }
+
+  // Clear the action whenever the snackbar closes on its own — which, with no
+  // close button on an action-carrying message and no swipe support in
+  // VSnackbar, means the timeout — so a stale handler closing over an old
+  // session id can't fire again if the snackbar is ever re-shown without going
+  // through showSnackbar.
   function onSnackbarToggle (value: boolean) {
     if (!value) {
       app.snackbarAction = null
