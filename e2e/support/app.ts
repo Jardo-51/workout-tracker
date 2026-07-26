@@ -581,12 +581,48 @@ export async function logIn (
   )
 }
 
+/** How many swallowed presses of *Sync now* are worth trying again. */
+const SYNC_ATTEMPTS = 5
+
+/**
+ * Presses *Sync now* and comes back only once a sync has really run.
+ *
+ * The press can do nothing at all. `useSyncStore.syncNow()` returns straight
+ * away when a run is already in flight — a mutation arms a 4 s debounce, so one
+ * often is — and only re-arms that timer. The loading state on the button
+ * belongs to the run already going and clears when *it* ends, so waiting on the
+ * button alone can hand back a device that has pushed nothing this test asked
+ * of it, leaving whatever is asserted next to read stale data.
+ *
+ * `EtesyncSettings.doSync` says *Synced* only when the run was its own, which
+ * makes that message the acknowledgement to wait for, and its absence the
+ * signal to press again. *You are offline* is the other answer the button
+ * gives, and it is a final one: the tests that ask for a sync while offline
+ * want exactly that message and no retrying.
+ *
+ * Anything else — no message at all — means the run failed, and the sync card's
+ * own error alert says why; the presses stop after {@link SYNC_ATTEMPTS} rather
+ * than spending the test's whole budget on a server that is not answering.
+ */
 export async function syncNow (page: Page) {
   await openSettings(page)
-  await settle(page)
   const button = page.getByRole('button', { name: 'Sync now' })
-  await button.click()
-  await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+  const answer = snackbar(page).filter({ hasText: /Synced|You are offline/ })
+  for (let attempt = 0; attempt < SYNC_ATTEMPTS; attempt++) {
+    await settle(page)
+    // Pressing into a run that is already going is the swallowed press itself.
+    await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+    await button.click()
+    await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+    const answered = await answer.waitFor({ timeout: 5000 }).then(() => true, () => false)
+    if (answered) {
+      return
+    }
+  }
+  throw new Error(
+    `Sync now was pressed ${SYNC_ATTEMPTS} times and no sync ran — `
+    + 'the Etesync card\'s error alert says why.',
+  )
 }
 
 /**

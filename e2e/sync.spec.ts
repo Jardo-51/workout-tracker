@@ -111,14 +111,13 @@ test.describe('sync between two devices', () => {
     await saveEntry(deviceB)
 
     // A pushes its version, B pulls it and keeps its own — which leaves B
-    // dirty, so it pushes over the top — and A pulls that. The fourth round is
-    // there because a mutation also schedules a sync of its own: one of the
-    // clicks above can find that run already in flight, having started before
-    // the other device pushed, and so do a round's work over stale data.
+    // dirty, so the same run pushes over the top — and A pulls that. Three
+    // rounds, and exactly three: `syncNow` presses again when the app tells it
+    // the press was swallowed by a run already in flight, so each of these is a
+    // round that happened rather than one that may have been.
     await syncNow(deviceA)
     await syncNow(deviceB)
     await syncNow(deviceA)
-    await syncNow(deviceB)
 
     await openSession(deviceA, '1 exercises')
     await expect(entryCard(deviceA, 'Squat')).toContainText('70 kg')
