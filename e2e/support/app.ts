@@ -46,15 +46,39 @@ export async function openDevice (browser: Browser): Promise<Page> {
  * devices, two of these are two tabs, and only the second kind can hear a
  * broadcast.
  *
- * Waits for Home in either of its shapes rather than for the start button:
- * unlike {@link openApp}, the device this tab joins may already have a session
- * open, in which case the resume card is what it finds.
+ * Comes back only once this tab is *listening*, which is the one property it
+ * exists to provide: `stores/sessions.ts` registers `onSessionChanged` and
+ * `onDataReplaced` at the end of its load, so until that load resolves the
+ * channel has not even been constructed and a message sent at this tab is
+ * dropped for good — there is no replay.
+ *
+ * {@link loadedHome} is what says the load resolved. Home's start button is
+ * rendered before it and so cannot: a wait on that alone would hand back a tab
+ * that hears nothing, and the caller would find out one flaky run in ten.
  */
 export async function openTab (page: Page): Promise<Page> {
   const tab = await page.context().newPage()
   await tab.goto('/')
-  await openHome(tab)
+  await expect(loadedHome(tab)).toBeVisible()
   return tab
+}
+
+/**
+ * Whichever part of Home only appears once the sessions store has finished
+ * reading IndexedDB — the resume card, a row in *Previous sessions*, or the
+ * *No workouts yet* placeholder, which `HomePage.vue` holds back until then for
+ * the same reason. One of the three is showing in every state the app can be
+ * in, and none of them before the load.
+ *
+ * `first()` because two of them can be up at once — a session under way and
+ * earlier ones below it — and a union matching twice is a strict-mode failure
+ * rather than the wait it was asked for.
+ */
+function loadedHome (page: Page) {
+  return resumeCard(page)
+    .or(sessionRow(page))
+    .or(page.getByText('No workouts yet'))
+    .first()
 }
 
 export async function openApp (page: Page) {
