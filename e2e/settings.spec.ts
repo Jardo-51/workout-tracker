@@ -33,9 +33,16 @@ import { accountFromEnv, ensureAccount } from './support/etebase'
  * the two preferences, and the account the sync card logs in and out of.
  *
  * Both preferences live in localStorage rather than in the database, so what
- * makes them worth a browser test is the reload — the store reads them back on
- * start, and Vuetify is handed the theme a second time in `plugins/vuetify.ts`
- * so a dark-mode user gets no white flash before the app mounts.
+ * makes them worth a browser test is the reload: the store reads them back on
+ * start, and that is what the reloads below are for.
+ *
+ * Deliberately *not* covered: the `defaultTheme` line in `plugins/vuetify.ts`,
+ * which exists so a dark-mode user gets no white flash before the app mounts.
+ * Every assertion here runs long after mount, by which point App.vue's
+ * `immediate` watcher has set the theme itself — delete that line and this
+ * file stays green. Proving it would mean asserting on the first paint, which
+ * is not worth the flake; anyone touching it should know a green run here says
+ * nothing about it.
  */
 test.describe('settings', () => {
   test.beforeEach(async ({ page }) => {
