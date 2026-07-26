@@ -93,8 +93,11 @@ test.describe('settings', () => {
       password: 'correct-horse-battery',
     })
 
-    await expect(loginError(page)).toBeVisible({ timeout: 60_000 })
-    await expect(loginError(page)).not.toBeEmpty()
+    // Not just "an error is showing": the alert only exists when there is a
+    // message in it, so its visibility says nothing about the message being
+    // any use. `doLogin` stringifies whatever is thrown, so "[object Object]"
+    // is a real possible outcome — the text has to name the failure.
+    await expect(loginError(page)).toHaveText(/network|connect|fetch/i, { timeout: 60_000 })
 
     // Still logged out: the card shows the form, not an account, and nothing
     // was saved that a reload could bring back as a half-configured sync.
@@ -132,7 +135,10 @@ test.describe('settings, with sync', () => {
     const keysBeforeLogin = await storedKeys(page)
     await submitLogin(page, { ...account!, password: `${account!.password}-wrong` })
 
-    await expect(loginError(page)).toBeVisible({ timeout: 60_000 })
+    // The server's own answer, not just any error: a test that accepted
+    // "Network request failed" here would pass against a login that never
+    // reached the server at all.
+    await expect(loginError(page)).toHaveText(/password/i, { timeout: 60_000 })
     await expect(page.getByRole('button', { name: 'Log in & sync' })).toBeVisible()
     expect(await storedKeys(page)).toEqual(keysBeforeLogin)
 
