@@ -54,10 +54,18 @@ default-unit preferences, which live in localStorage and so are really a test
 of what survives a reload, and the sync card's login and logout.
 
 `backup.spec.ts` runs on a device with sync switched off and needs nothing but
-the app. `sync-backup.spec.ts` drives two browser contexts as two devices
-against a real Etesync server, and **skips itself** unless one is configured —
-so the default run stays self-contained. The account half of `settings.spec.ts`
-skips on the same condition; the rest of that file always runs.
+the app. `sync.spec.ts` and `sync-backup.spec.ts` drive two browser contexts as
+two devices against a real Etesync server, and **skip themselves** unless one is
+configured — so the default run stays self-contained. The account half of
+`settings.spec.ts` skips on the same condition; the rest of that file always
+runs.
+
+The two synced files split by what they are about. `sync.spec.ts` is sync
+itself: a session and then its deletion travelling from one device to the
+other, both devices editing the same session and having to agree on one copy
+afterwards, and a device that recorded a workout while offline pushing it when
+the connection comes back — nothing there involves a backup file.
+`sync-backup.spec.ts` is what export, clear and import do to an account.
 
 The synced tests are worth the setup: with sync on, *Clear all workouts* leaves
 tombstones that reach the account, and a restore has to beat them on both

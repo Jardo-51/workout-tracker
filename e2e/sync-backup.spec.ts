@@ -1,4 +1,3 @@
-import type { Browser, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import {
   confirmClear,
@@ -6,8 +5,8 @@ import {
   exportBackup,
   importBackup,
   logIn,
-  openApp,
   openClearDialog,
+  openDevice,
   recordWorkout,
   snackbar,
   storedSessions,
@@ -105,11 +104,3 @@ test.describe('backup, with sync', () => {
     expect(await visibleSessions(deviceB)).toHaveLength(2)
   })
 })
-
-async function openDevice (browser: Browser): Promise<Page> {
-  // A context per device: separate IndexedDB, separate saved Etebase session.
-  const context = await browser.newContext({ acceptDownloads: true })
-  const page = await context.newPage()
-  await openApp(page)
-  return page
-}

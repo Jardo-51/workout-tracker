@@ -1,6 +1,6 @@
 import type { Session, Tempo, WeightUnit } from '../../src/types/workout'
 import fs from 'node:fs/promises'
-import { expect, type Locator, type Page } from '@playwright/test'
+import { type Browser, expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * Driving the app the way a user does: the bottom nav, the buttons, the
@@ -20,6 +20,21 @@ export interface Backup {
   fileVersion: number
   exportedAt: string
   sessions: Session[]
+}
+
+/**
+ * One device: its own browser context, so its own IndexedDB and its own saved
+ * Etebase session. Two of these is what makes a test about syncing between
+ * devices rather than between two tabs of one.
+ *
+ * Downloads are accepted because a device may be asked to export a backup;
+ * nothing else here needs it.
+ */
+export async function openDevice (browser: Browser): Promise<Page> {
+  const context = await browser.newContext({ acceptDownloads: true })
+  const page = await context.newPage()
+  await openApp(page)
+  return page
 }
 
 export async function openApp (page: Page) {
