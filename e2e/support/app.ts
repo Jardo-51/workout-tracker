@@ -35,6 +35,12 @@ export async function openApp (page: Page) {
  * most of its tests spends that idling. The close button is the same one a user
  * has.
  *
+ * That click is best-effort — bounded, and its failure swallowed — because the
+ * message can expire under it: finding the button says nothing about it still
+ * being there when the click lands, and an unbounded click left waiting for a
+ * button that has gone holds on until the test itself times out. Whatever the
+ * click does not manage, the wait below covers.
+ *
  * A message offering an undo deliberately has no close button, so that one is
  * still waited out — and its 6 s window is why the wait here is longer than
  * that, rather than the 5 s it used to be, which could expire first and hand
@@ -42,10 +48,9 @@ export async function openApp (page: Page) {
  */
 export async function settle (page: Page) {
   const snack = page.locator('.v-snackbar--active').first()
-  const close = snack.getByRole('button', { name: 'Close' })
-  if (await close.isVisible()) {
-    await close.click()
-  }
+  await snack.getByRole('button', { name: 'Close' })
+    .click({ timeout: 1000 })
+    .catch(() => {})
   await snack.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {})
 }
 
