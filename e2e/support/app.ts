@@ -1,6 +1,6 @@
 import type { Session, Tempo, WeightUnit } from '../../src/types/workout'
 import fs from 'node:fs/promises'
-import { expect, type Locator, type Page } from '@playwright/test'
+import { type Browser, expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * Driving the app the way a user does: the bottom nav, the buttons, the
@@ -20,6 +20,21 @@ export interface Backup {
   fileVersion: number
   exportedAt: string
   sessions: Session[]
+}
+
+/**
+ * One device: its own browser context, so its own IndexedDB and its own saved
+ * Etebase session. Two of these is what makes a test about syncing between
+ * devices rather than between two tabs of one.
+ *
+ * Downloads are accepted because a device may be asked to export a backup;
+ * nothing else here needs it.
+ */
+export async function openDevice (browser: Browser): Promise<Page> {
+  const context = await browser.newContext({ acceptDownloads: true })
+  const page = await context.newPage()
+  await openApp(page)
+  return page
 }
 
 export async function openApp (page: Page) {
@@ -566,12 +581,48 @@ export async function logIn (
   )
 }
 
+/** How many swallowed presses of *Sync now* are worth trying again. */
+const SYNC_ATTEMPTS = 5
+
+/**
+ * Presses *Sync now* and comes back only once a sync has really run.
+ *
+ * The press can do nothing at all. `useSyncStore.syncNow()` returns straight
+ * away when a run is already in flight — a mutation arms a 4 s debounce, so one
+ * often is — and only re-arms that timer. The loading state on the button
+ * belongs to the run already going and clears when *it* ends, so waiting on the
+ * button alone can hand back a device that has pushed nothing this test asked
+ * of it, leaving whatever is asserted next to read stale data.
+ *
+ * `EtesyncSettings.doSync` says *Synced* only when the run was its own, which
+ * makes that message the acknowledgement to wait for, and its absence the
+ * signal to press again. *You are offline* is the other answer the button
+ * gives, and it is a final one: the tests that ask for a sync while offline
+ * want exactly that message and no retrying.
+ *
+ * Anything else — no message at all — means the run failed, and the sync card's
+ * own error alert says why; the presses stop after {@link SYNC_ATTEMPTS} rather
+ * than spending the test's whole budget on a server that is not answering.
+ */
 export async function syncNow (page: Page) {
   await openSettings(page)
-  await settle(page)
   const button = page.getByRole('button', { name: 'Sync now' })
-  await button.click()
-  await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+  const answer = snackbar(page).filter({ hasText: /Synced|You are offline/ })
+  for (let attempt = 0; attempt < SYNC_ATTEMPTS; attempt++) {
+    await settle(page)
+    // Pressing into a run that is already going is the swallowed press itself.
+    await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+    await button.click()
+    await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+    const answered = await answer.waitFor({ timeout: 5000 }).then(() => true, () => false)
+    if (answered) {
+      return
+    }
+  }
+  throw new Error(
+    `Sync now was pressed ${SYNC_ATTEMPTS} times and no sync ran — `
+    + 'the Etesync card\'s error alert says why.',
+  )
 }
 
 /**

@@ -26,7 +26,7 @@ import {
   themeColor,
   weightUnitButton,
 } from './support/app'
-import { accountFromEnv, ensureAccount } from './support/etebase'
+import { syncedDescribe } from './support/etebase'
 
 /**
  * The Settings cards other than Backup, which `backup.spec.ts` already covers:
@@ -124,23 +124,14 @@ test.describe('settings', () => {
  * The account itself, which needs a real server: a rejected password and a
  * logout are both answers only the server can give. See e2e/README.md.
  */
-const account = accountFromEnv()
-
-test.describe('settings, with sync', () => {
-  test.skip(!account, 'set E2E_ETEBASE_URL to run the sync tests — see e2e/README.md')
-  test.describe.configure({ mode: 'serial' })
-
-  test.beforeAll(async () => {
-    await ensureAccount(account!)
-  })
-
+syncedDescribe('settings, with sync', account => {
   test.beforeEach(async ({ page }) => {
     await openApp(page)
   })
 
   test('refuses a wrong password, and takes the right one afterwards', async ({ page }) => {
     const keysBeforeLogin = await storedKeys(page)
-    await submitLogin(page, { ...account!, password: `${account!.password}-wrong` })
+    await submitLogin(page, { ...account, password: `${account.password}-wrong` })
 
     // The server's own answer, not just any error: a test that accepted
     // "Network request failed" here would pass against a login that never
@@ -150,13 +141,13 @@ test.describe('settings, with sync', () => {
     expect(await storedKeys(page)).toEqual(keysBeforeLogin)
 
     // The form is left usable, not wedged in its error state.
-    await logIn(page, account!)
+    await logIn(page, account)
     expect(await storedKeys(page)).toContain('etesync.session')
   })
 
   test('logs out, keeping the workouts and dropping the sync bookkeeping', async ({ page }) => {
     const keysBeforeLogin = await storedKeys(page)
-    await logIn(page, account!)
+    await logIn(page, account)
     // The account outlives the run, so start from empty — otherwise the row
     // count below is whatever a previous test happened to leave up there.
     await emptyTheAccount(page)

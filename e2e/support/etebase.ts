@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { test } from '@playwright/test'
 import * as Etebase from 'etebase'
 
 /**
@@ -63,4 +64,29 @@ export async function ensureAccount (account: Account): Promise<void> {
 
 function message (error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The `test.describe` every spec that needs the server wants: skipped whole
+ * when none is configured, serial because they all share one long-lived
+ * account, and that account signed up once before any test in the block runs.
+ *
+ * The body is handed the account already narrowed, which is what spares each
+ * test inside a `account!` on every use. A describe-level `test.skip` cannot
+ * narrow anything — it decides at run time, while the tests are registered
+ * either way — so the cast below is where that is admitted: once, next to the
+ * skip that is the reason nothing inside ever sees the undefined.
+ */
+export function syncedDescribe (title: string, body: (account: Account) => void) {
+  const account = accountFromEnv() as Account
+  test.describe(title, () => {
+    test.skip(!account, 'set E2E_ETEBASE_URL to run the sync tests — see e2e/README.md')
+    test.describe.configure({ mode: 'serial' })
+
+    test.beforeAll(async () => {
+      await ensureAccount(account)
+    })
+
+    body(account)
+  })
 }

@@ -1,4 +1,3 @@
-import type { Browser, Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import {
   confirmClear,
@@ -6,15 +5,15 @@ import {
   exportBackup,
   importBackup,
   logIn,
-  openApp,
   openClearDialog,
+  openDevice,
   recordWorkout,
   snackbar,
   storedSessions,
   syncNow,
   visibleSessions,
 } from './support/app'
-import { accountFromEnv, ensureAccount } from './support/etebase'
+import { syncedDescribe } from './support/etebase'
 
 /**
  * Backup on a device that syncs, driven as two devices against a real server.
@@ -24,21 +23,12 @@ import { accountFromEnv, ensureAccount } from './support/etebase'
  * other device, which still holds the tombstone it pulled. See e2e/README.md
  * for the server these want.
  */
-const account = accountFromEnv()
-
-test.describe('backup, with sync', () => {
-  test.skip(!account, 'set E2E_ETEBASE_URL to run the sync tests — see e2e/README.md')
-  test.describe.configure({ mode: 'serial' })
-
-  test.beforeAll(async () => {
-    await ensureAccount(account!)
-  })
-
+syncedDescribe('backup, with sync', account => {
   test('a clear and an import both reach the account', async ({ browser }, testInfo) => {
     const deviceA = await openDevice(browser)
     const deviceB = await openDevice(browser)
 
-    await logIn(deviceA, account!)
+    await logIn(deviceA, account)
     // The account outlives the run, so start from whatever it holds: clearing
     // is the app's own way of emptying it, and makes this repeatable.
     await emptyTheAccount(deviceA)
@@ -49,7 +39,7 @@ test.describe('backup, with sync', () => {
     const recorded = await visibleSessions(deviceA)
     expect(recorded).toHaveLength(2)
 
-    await logIn(deviceB, account!)
+    await logIn(deviceB, account)
     await syncNow(deviceB)
     expect(await visibleSessions(deviceB)).toHaveLength(2)
 
@@ -105,11 +95,3 @@ test.describe('backup, with sync', () => {
     expect(await visibleSessions(deviceB)).toHaveLength(2)
   })
 })
-
-async function openDevice (browser: Browser): Promise<Page> {
-  // A context per device: separate IndexedDB, separate saved Etebase session.
-  const context = await browser.newContext({ acceptDownloads: true })
-  const page = await context.newPage()
-  await openApp(page)
-  return page
-}
