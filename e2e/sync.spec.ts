@@ -135,6 +135,15 @@ test.describe('sync between two devices', () => {
   })
 
   test('pushes a workout recorded offline once the connection is back', async ({ browser }) => {
+    // Above the suite's 120 s, because the poll at the end is allowed 60 of
+    // them and everything before it — two logins, an emptying of the account, a
+    // recorded workout, a refused sync, a reload — can eat the rest. In the
+    // failure this test exists to catch the poll has to be what runs out, so
+    // that its message is what the report shows: on the global timeout the
+    // reader gets "Test timeout of 120000ms exceeded" and nothing about the
+    // `online` listener that was being asserted on.
+    test.setTimeout(180_000)
+
     const deviceA = await openDevice(browser)
     const deviceB = await openDevice(browser)
 
