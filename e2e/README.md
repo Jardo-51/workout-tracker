@@ -118,15 +118,16 @@ sessions the test itself made, by id.
 ## Conventions
 
 - Drive the app the way a user does: bottom nav, buttons, dialogs. Four
-  helpers are allowed past that, for one reason: what those tests are about has
+  reaches past that are allowed, for one reason: what those tests are about has
   no form on screen. `storedSessions` reads the rows, because "a tombstone or
   no row at all" is the difference several tests turn on; `storedKeys` and
   `storedSyncState` read localStorage and the sync bookkeeping, because what a
   logout leaves behind is what a later login would push at whatever account it
-  is then given; `holdSyncLock` takes the app's own Web Lock, because "another
-  tab is syncing" is invisible *and* untimeable — a run against a local server
-  is over in milliseconds, so a second tab has no window to be caught in. A
-  fifth needs the same kind of argument, not merely that reaching in is easier.
+  is then given; `holdSyncLock`/`releaseSyncLock` take the app's own Web Lock
+  and give it back — one reach, in two halves — because "another tab is
+  syncing" is invisible *and* untimeable, a run against a local server being
+  over in milliseconds, so a second tab has no window to be caught in. A fifth
+  needs the same kind of argument, not merely that reaching in is easier.
 - Assert with `expect`, which retries. No sleeps: waiting for a sync means
   waiting for the button to stop loading, not for four seconds to pass.
 - Snackbars sit over the bottom nav and swallow clicks aimed at it — the

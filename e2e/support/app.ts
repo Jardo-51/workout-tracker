@@ -5,13 +5,14 @@ import { SYNC_LOCK } from '../../src/services/broadcast'
 
 /**
  * Driving the app the way a user does: the bottom nav, the buttons, the
- * dialogs. Four helpers reach past that, all for the same reason — the thing
- * those tests are about has no form on screen: {@link storedSessions}, because
- * the difference between a tombstone and a removed row is invisible;
+ * dialogs. Four reaches past that, all for the same reason — the thing those
+ * tests are about has no form on screen: {@link storedSessions}, because the
+ * difference between a tombstone and a removed row is invisible;
  * {@link storedKeys} and {@link storedSyncState}, because what a logout leaves
  * behind is what a later login would push at whatever account it is given; and
- * {@link holdSyncLock}, because "another tab is already syncing" is a state
- * nothing on screen shows and nothing in a test can time.
+ * {@link holdSyncLock} with {@link releaseSyncLock}, one reach taken and given
+ * back, because "another tab is already syncing" is a state nothing on screen
+ * shows and nothing in a test can time.
  *
  * A fifth wants that same argument, not just convenience.
  */
