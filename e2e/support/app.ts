@@ -647,6 +647,10 @@ const SYNC_ATTEMPTS = 5
  * Anything else — no message at all — means the run failed, and the sync card's
  * own error alert says why; the presses stop after {@link SYNC_ATTEMPTS} rather
  * than spending the test's whole budget on a server that is not answering.
+ *
+ * Each attempt is a whole {@link pressSyncNow}, Settings and all, so the caller
+ * can be anywhere in the app and a retry starts from the same place the first
+ * press did.
  */
 export async function syncNow (page: Page) {
   const answer = snackbar(page).filter({ hasText: /Synced|You are offline/ })
@@ -671,11 +675,16 @@ export async function syncNow (page: Page) {
  * for the one test that is about a press being *refused*, while another tab
  * holds the sync lock. There the acknowledgement never comes, so pressing
  * through that helper would spend five attempts and then throw.
+ *
+ * Navigating to Settings is part of the press rather than something the caller
+ * arranges, which is what lets {@link syncNow} retry by simply calling this
+ * again. `openSettings` settles the screen on its way through, so nothing more
+ * is needed before the click: a snackbar cannot arrive in the gap between the
+ * two, and settling twice per press cost every retry a wait for nothing.
  */
 export async function pressSyncNow (page: Page) {
   await openSettings(page)
   const button = page.getByRole('button', { name: 'Sync now' })
-  await settle(page)
   // Pressing into a run that is already going is the swallowed press itself.
   await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
   await button.click()
