@@ -353,9 +353,39 @@ export async function openSession (page: Page, text: string | RegExp) {
 export async function setDefaultWeightUnit (page: Page, unit: WeightUnit) {
   await openSettings(page)
   await settle(page)
-  const button = page.getByRole('button', { name: unit, exact: true })
-  await button.click()
-  await expect(button).toHaveClass(/v-btn--active/)
+  await weightUnitButton(page, unit).click()
+  await expect(weightUnitButton(page, unit)).toHaveClass(/v-btn--active/)
+}
+
+/** One side of the Units card's toggle; `v-btn--active` marks the chosen one. */
+export function weightUnitButton (page: Page, unit: WeightUnit) {
+  return page.getByRole('button', { name: unit, exact: true })
+}
+
+/** The Appearance card's switch. Its own label is what the user reads. */
+export function darkModeSwitch (page: Page) {
+  return page.getByLabel('Dark mode')
+}
+
+/**
+ * The element Vuetify hangs the active theme off, as `v-theme--dark` or
+ * `v-theme--light` — the one place the choice is observable from outside.
+ */
+export function appRoot (page: Page) {
+  return page.locator('.v-application')
+}
+
+/** The colour the browser paints its own chrome with, kept in step by App.vue. */
+export function themeColor (page: Page): Promise<string | null> {
+  return page.locator('meta[name="theme-color"]').getAttribute('content')
+}
+
+/** Turns dark mode on or off from the Appearance card. */
+export async function setDarkMode (page: Page, dark: boolean) {
+  await openSettings(page)
+  await settle(page)
+  await darkModeSwitch(page).setChecked(dark)
+  await expect(appRoot(page)).toHaveClass(dark ? /v-theme--dark/ : /v-theme--light/)
 }
 
 /** Deletes the workout at the top of the Home list, confirming the dialog. */
@@ -450,7 +480,22 @@ export async function confirmClear (dialog: Locator) {
   await expect(dialog).toBeHidden()
 }
 
-export async function logIn (
+/** The Etesync sync card, which is the login form or the account, never both. */
+export function etesyncCard (page: Page) {
+  return page.locator('.v-card').filter({ hasText: 'Etesync sync' })
+}
+
+/** Whatever the login form is complaining about, if anything. */
+export function loginError (page: Page) {
+  return etesyncCard(page).locator('.v-alert')
+}
+
+/**
+ * Fills the login form and submits it, without waiting for an outcome — which
+ * is the point: the tests that want a *failed* login have no "Syncing as" to
+ * wait for, only the form's own error.
+ */
+export async function submitLogin (
   page: Page,
   account: { url: string, username: string, password: string },
 ) {
@@ -459,6 +504,13 @@ export async function logIn (
   await page.getByLabel('Username').fill(account.username)
   await page.getByLabel('Password').fill(account.password)
   await page.getByRole('button', { name: 'Log in & sync' }).click()
+}
+
+export async function logIn (
+  page: Page,
+  account: { url: string, username: string, password: string },
+) {
+  await submitLogin(page, account)
   await expect(page.getByText(`Syncing as ${account.username}`)).toBeVisible({ timeout: 60_000 })
   // The login runs a first sync; let it finish before anything else starts one.
   await expect(page.getByRole('button', { name: 'Sync now' })).not.toHaveClass(
@@ -473,4 +525,72 @@ export async function syncNow (page: Page) {
   const button = page.getByRole('button', { name: 'Sync now' })
   await button.click()
   await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+}
+
+/**
+ * Leaves the logged-in account with no workouts in it, whatever a previous run
+ * left. Clearing is the app's own way of emptying it, which is what makes a
+ * run against a long-lived test account repeatable.
+ */
+export async function emptyTheAccount (page: Page) {
+  await syncNow(page)
+  if ((await visibleSessions(page)).length > 0) {
+    await clearAllWorkouts(page)
+    await syncNow(page)
+  }
+}
+
+/**
+ * Logs out and waits for the store to have finished doing it.
+ *
+ * The message is the wait, not the form coming back: `logout()` drops the
+ * saved session first — which is what re-renders the card — and only then
+ * waits out a sync that is already running, clears the sync state out of
+ * IndexedDB and tells the server. The snackbar is shown after all of that, so
+ * it is the one point from which the leftovers can be read without racing the
+ * clearing of them.
+ */
+export async function logOut (page: Page) {
+  await openSettings(page)
+  await settle(page)
+  await page.getByRole('button', { name: 'Log out' }).click()
+  await expect(snackbar(page)).toHaveText(
+    'Sync disabled — data stays on this device',
+    { timeout: 60_000 },
+  )
+}
+
+/** The `etesync.*` keys of localStorage, which is where the account lives. */
+export function storedSyncKeys (page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Object.keys(localStorage).filter(key => key.startsWith('etesync.')).toSorted(),
+  )
+}
+
+/**
+ * The sync bookkeeping in IndexedDB — the per-session etebase caches, and the
+ * sync service's own keys in the shared `meta` store. What a logout leaves
+ * behind here is what a later login would push at the account.
+ */
+export function storedSyncState (page: Page): Promise<{ syncMeta: string[], meta: string[] }> {
+  return page.evaluate(async () => {
+    const settled = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
+      request.addEventListener('success', () => resolve(request.result))
+      request.addEventListener('error', () => reject(request.error))
+    })
+    const db = await settled(indexedDB.open('workout-tracker'))
+    try {
+      const tx = db.transaction(['syncMeta', 'meta'])
+      const [syncMeta, meta] = await Promise.all([
+        settled(tx.objectStore('syncMeta').getAllKeys()),
+        settled(tx.objectStore('meta').getAllKeys()),
+      ])
+      return {
+        syncMeta: syncMeta.map(String).toSorted(),
+        meta: meta.map(String).toSorted(),
+      }
+    } finally {
+      db.close()
+    }
+  })
 }

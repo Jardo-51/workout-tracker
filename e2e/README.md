@@ -49,10 +49,15 @@ used through: recording, editing and removing entries and breaks in a session,
 and what Home shows for each of the states it can be in. Between them they are
 the only tests that render most of `components/session/`.
 
+`settings.spec.ts` covers the Settings cards that are not Backup: the theme and
+default-unit preferences, which live in localStorage and so are really a test
+of what survives a reload, and the sync card's login and logout.
+
 `backup.spec.ts` runs on a device with sync switched off and needs nothing but
 the app. `sync-backup.spec.ts` drives two browser contexts as two devices
 against a real Etesync server, and **skips itself** unless one is configured —
-so the default run stays self-contained.
+so the default run stays self-contained. The account half of `settings.spec.ts`
+skips on the same condition; the rest of that file always runs.
 
 The synced tests are worth the setup: with sync on, *Clear all workouts* leaves
 tombstones that reach the account, and a restore has to beat them on both
