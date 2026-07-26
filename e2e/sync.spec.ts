@@ -176,6 +176,14 @@ test.describe('sync between two devices', () => {
     // assertion below passes with the listener deleted. The reload drops it.
     // What the fresh page starts on its own is the sync in `init`, and that
     // one bails on `navigator.onLine` like the button did.
+    //
+    // Reloading offline at all is the service worker's doing: the build is
+    // precached by `VitePWA`'s `globPatterns` (`vite.config.mts`), and the page
+    // being reloaded is `/settings` — wherever `syncNow` last navigated — so
+    // this leans on the navigate fallback and the lazily-loaded settings chunk
+    // being in that precache too. If precaching ever regresses, this line is
+    // where it shows up, as `net::ERR_INTERNET_DISCONNECTED` in a sync test
+    // that says nothing about service workers.
     await deviceA.reload()
     await openHome(deviceA)
     // Offline and freshly started, the workout is still there: it was written
