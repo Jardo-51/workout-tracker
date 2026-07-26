@@ -26,12 +26,27 @@ export async function openApp (page: Page) {
 }
 
 /**
- * Snackbars sit over the bottom of the screen, where the nav is, and swallow
- * the clicks aimed at it. Resolves immediately when none is showing.
+ * Snackbars sit over the bottom of the screen, where the nav and the session
+ * action bar are, and swallow the clicks aimed at them. Resolves immediately
+ * when none is showing.
+ *
+ * Dismissed rather than waited out where that is possible: the message would
+ * otherwise stay up for its full timeout and a suite that finishes a session in
+ * most of its tests spends that idling. The close button is the same one a user
+ * has.
+ *
+ * A message offering an undo deliberately has no close button, so that one is
+ * still waited out — and its 6 s window is why the wait here is longer than
+ * that, rather than the 5 s it used to be, which could expire first and hand
+ * back a screen still covered by the snackbar.
  */
 export async function settle (page: Page) {
   const snack = page.locator('.v-snackbar--active').first()
-  await snack.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+  const close = snack.getByRole('button', { name: 'Close' })
+  if (await close.isVisible()) {
+    await close.click()
+  }
+  await snack.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {})
 }
 
 async function navigate (page: Page, to: 'Home' | 'Settings') {
