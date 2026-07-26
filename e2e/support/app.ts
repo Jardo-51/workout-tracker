@@ -4,10 +4,14 @@ import { expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * Driving the app the way a user does: the bottom nav, the buttons, the
- * dialogs. Nothing here reaches into the app's internals except
- * {@link storedSessions}, which reads IndexedDB because "what is actually on
- * the device" is the thing several of these tests are about — the difference
- * between a tombstone and a removed row is invisible on screen.
+ * dialogs. Three helpers reach into the app's internals, all for the same
+ * reason — "what is actually on the device" is the thing those tests are about,
+ * and it has no visible form: {@link storedSessions}, because the difference
+ * between a tombstone and a removed row is invisible on screen, and
+ * {@link storedKeys} and {@link storedSyncState}, because what a logout leaves
+ * behind is what a later login would push at whatever account it is given.
+ *
+ * A fourth wants that same argument, not just convenience.
  */
 
 /** Shape of an export file, as `services/backup.ts` writes it. */

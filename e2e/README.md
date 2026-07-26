@@ -94,10 +94,15 @@ one, never an account with real workouts in it.
 
 ## Conventions
 
-- Drive the app the way a user does: bottom nav, buttons, dialogs. The one
-  exception is `storedSessions`, which reads IndexedDB, because "a tombstone or
-  no row at all" is exactly what several of these tests are about and it is
-  invisible on screen.
+- Drive the app the way a user does: bottom nav, buttons, dialogs. Three
+  helpers are allowed past that, for one reason: what is *left on the device*
+  is exactly what those tests are about, and none of it shows on screen.
+  `storedSessions` reads the rows, because "a tombstone or no row at all" is
+  the difference several tests turn on; `storedKeys` and `storedSyncState` read
+  localStorage and the sync bookkeeping, because what a logout leaves behind is
+  what a later login would push at whatever account it is then given. A fourth
+  needs the same kind of argument — that the thing asserted on has no visible
+  form — not merely that reaching in is easier.
 - Assert with `expect`, which retries. No sleeps: waiting for a sync means
   waiting for the button to stop loading, not for four seconds to pass.
 - Snackbars sit over the bottom nav and swallow clicks aimed at it — the
