@@ -17,7 +17,7 @@ import {
   syncNow,
   visibleSessions,
 } from './support/app'
-import { accountFromEnv, ensureAccount } from './support/etebase'
+import { syncedDescribe } from './support/etebase'
 
 /**
  * Sync itself, driven as two devices against a real server: a session made on
@@ -35,25 +35,16 @@ import { accountFromEnv, ensureAccount } from './support/etebase'
  * what export, clear and import do to an account. Neither file needs a backup
  * file to be involved here. See e2e/README.md for the server these want.
  */
-const account = accountFromEnv()
-
-test.describe('sync between two devices', () => {
-  test.skip(!account, 'set E2E_ETEBASE_URL to run the sync tests — see e2e/README.md')
-  test.describe.configure({ mode: 'serial' })
-
-  test.beforeAll(async () => {
-    await ensureAccount(account!)
-  })
-
+syncedDescribe('sync between two devices', account => {
   test('carries a workout to the other device, and its deletion after it', async ({ browser }) => {
     const deviceA = await openDevice(browser)
     const deviceB = await openDevice(browser)
 
-    await logIn(deviceA, account!)
+    await logIn(deviceA, account)
     // The account outlives the run and the other specs share it, so start from
     // whatever it holds — the app's own clear is how it is emptied.
     await emptyTheAccount(deviceA)
-    await logIn(deviceB, account!)
+    await logIn(deviceB, account)
     expect(await visibleSessions(deviceB)).toHaveLength(0)
 
     await recordWorkout(deviceB, 'Overhead press', { weight: 40, reps: 6 })
@@ -86,12 +77,12 @@ test.describe('sync between two devices', () => {
     const deviceA = await openDevice(browser)
     const deviceB = await openDevice(browser)
 
-    await logIn(deviceA, account!)
+    await logIn(deviceA, account)
     await emptyTheAccount(deviceA)
     await recordWorkout(deviceA, 'Squat', { weight: 60, reps: 5 })
     await syncNow(deviceA)
 
-    await logIn(deviceB, account!)
+    await logIn(deviceB, account)
     await openHome(deviceB)
     await expect(sessionRow(deviceB)).toHaveCount(1)
 
@@ -147,9 +138,9 @@ test.describe('sync between two devices', () => {
     const deviceA = await openDevice(browser)
     const deviceB = await openDevice(browser)
 
-    await logIn(deviceA, account!)
+    await logIn(deviceA, account)
     await emptyTheAccount(deviceA)
-    await logIn(deviceB, account!)
+    await logIn(deviceB, account)
 
     await deviceA.context().setOffline(true)
     await recordWorkout(deviceA, 'Pull-up', { reps: 8 })
