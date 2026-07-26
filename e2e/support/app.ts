@@ -401,20 +401,46 @@ export async function deleteNewestWorkout (page: Page) {
   await expect(confirm).toBeHidden()
 }
 
-/** Every row in IndexedDB, tombstones included. */
-export function storedSessions (page: Page): Promise<Session[]> {
-  return page.evaluate(async () => {
+/**
+ * Empties the named object stores of the app's database, in one transaction —
+ * either their rows or just their keys, one array per store in the order asked.
+ *
+ * What to read is passed as data rather than as a callback because
+ * `page.evaluate` ships the function to the browser as source: it closes over
+ * nothing, so anything a caller wanted to reuse — the request-to-promise
+ * wrapping, the open, the `close()` — would have to be written out again inside
+ * every caller's own callback.
+ */
+function readDb (
+  page: Page,
+  stores: string[],
+  read: 'getAll' | 'getAllKeys',
+): Promise<unknown[][]> {
+  return page.evaluate(async ({ read, stores }) => {
     const settled = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
       request.addEventListener('success', () => resolve(request.result))
       request.addEventListener('error', () => reject(request.error))
     })
     const db = await settled(indexedDB.open('workout-tracker'))
     try {
-      return await settled(db.transaction('sessions').objectStore('sessions').getAll()) as Session[]
+      const tx = db.transaction(stores)
+      return await Promise.all(stores.map(async name => {
+        const store = tx.objectStore(name)
+        // Branched rather than picking the method first: the two requests
+        // resolve to different types, and a union of them is not an
+        // `IDBRequest` of anything.
+        return read === 'getAll' ? await settled(store.getAll()) : await settled(store.getAllKeys())
+      }))
     } finally {
       db.close()
     }
-  })
+  }, { read, stores })
+}
+
+/** Every row in IndexedDB, tombstones included. */
+export async function storedSessions (page: Page): Promise<Session[]> {
+  const [sessions] = await readDb(page, ['sessions'], 'getAll')
+  return sessions as Session[]
 }
 
 export async function visibleSessions (page: Page): Promise<Session[]> {
@@ -593,25 +619,10 @@ export function storedKeys (page: Page): Promise<string[]> {
  * sync service's own keys in the shared `meta` store. What a logout leaves
  * behind here is what a later login would push at the account.
  */
-export function storedSyncState (page: Page): Promise<{ syncMeta: string[], meta: string[] }> {
-  return page.evaluate(async () => {
-    const settled = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
-      request.addEventListener('success', () => resolve(request.result))
-      request.addEventListener('error', () => reject(request.error))
-    })
-    const db = await settled(indexedDB.open('workout-tracker'))
-    try {
-      const tx = db.transaction(['syncMeta', 'meta'])
-      const [syncMeta, meta] = await Promise.all([
-        settled(tx.objectStore('syncMeta').getAllKeys()),
-        settled(tx.objectStore('meta').getAllKeys()),
-      ])
-      return {
-        syncMeta: syncMeta.map(String).toSorted(),
-        meta: meta.map(String).toSorted(),
-      }
-    } finally {
-      db.close()
-    }
-  })
+export async function storedSyncState (page: Page): Promise<{ syncMeta: string[], meta: string[] }> {
+  const [syncMeta, meta] = await readDb(page, ['syncMeta', 'meta'], 'getAllKeys')
+  return {
+    syncMeta: syncMeta.map(String).toSorted(),
+    meta: meta.map(String).toSorted(),
+  }
 }
