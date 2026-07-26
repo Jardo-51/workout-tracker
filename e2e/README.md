@@ -92,6 +92,15 @@ is in it — the app's own *Clear all workouts*, which is also the thing being
 tested. A run therefore empties the account it is pointed at: use a throwaway
 one, never an account with real workouts in it.
 
+It also carries over between *specs*: more than one file logs into it now, they
+run in file order under a single worker, and whichever runs first leaves its
+sessions there. So a spec that uses the account must start by emptying it
+(`emptyTheAccount`), and must not assert on totals of what came back from the
+server — not row counts, not tombstone counts. A clear leaves its tombstones on
+the account permanently and a login pulls every one of them down, so a total
+only holds on an account nothing has ever been cleared from. Assert about the
+sessions the test itself made, by id.
+
 ## Conventions
 
 - Drive the app the way a user does: bottom nav, buttons, dialogs. Three
