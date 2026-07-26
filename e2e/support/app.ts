@@ -746,6 +746,33 @@ export async function releaseSyncLock (page: Page) {
 }
 
 /**
+ * Waits for a session recorded elsewhere to reach `observer`, by id.
+ *
+ * The observer has to keep asking, which is what makes this a poll around a
+ * whole sync rather than a wait on anything: the tests that want this are the
+ * ones where the *other* device pushes on its own schedule — an `online`
+ * listener firing, or a refused run re-arming its debounce — and pressing
+ * *Sync now* over there would make them pass whether or not the thing under
+ * test exists. Nothing on either device announces the moment it happens, so the
+ * only question that can be asked is "is it there yet".
+ *
+ * `message` is what the report shows when it never arrives, so it should name
+ * the mechanism the test is about. Sixty seconds of asking is what a caller is
+ * buying, which is why both of them raise their own budget to 180 s: this
+ * message has to be what runs out first, rather than *"Test timeout
+ * exceeded"*, which would say nothing about what was being waited for.
+ */
+export async function expectPushed (observer: Page, sessionId: string, message: string) {
+  await expect.poll(
+    async () => {
+      await syncNow(observer)
+      return (await visibleSessions(observer)).map(session => session.id)
+    },
+    { message, timeout: 60_000 },
+  ).toContain(sessionId)
+}
+
+/**
  * Leaves the logged-in account with no workouts in it, whatever a previous run
  * left. Clearing is the app's own way of emptying it, which is what makes a
  * run against a long-lived test account repeatable.

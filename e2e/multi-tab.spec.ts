@@ -3,6 +3,7 @@ import {
   clearAllWorkouts,
   emptyTheAccount,
   entryCard,
+  expectPushed,
   exportBackup,
   fillWorkoutValues,
   holdSyncLock,
@@ -95,10 +96,9 @@ test.describe('two tabs of one device', () => {
 syncedDescribe('two tabs of one device on one account', account => {
   test('stops the second tab syncing while the first one is', async ({ browser }) => {
     // Above the suite's 120 s, for the same reason as the offline test in
-    // sync.spec.ts: the poll at the end is allowed 60 of them, and two logins,
-    // an emptying of the account and a recorded workout can eat the rest. The
-    // failure this test is for has to land on the poll's own message rather
-    // than on "Test timeout of 120000ms exceeded", which says nothing.
+    // sync.spec.ts: `expectPushed` at the end is allowed 60 of them, and two
+    // logins, an emptying of the account and a recorded workout can eat the
+    // rest.
     test.setTimeout(180_000)
 
     const device = await openDevice(browser)
@@ -135,17 +135,14 @@ syncedDescribe('two tabs of one device on one account', account => {
 
     await releaseSyncLock(device)
 
-    // No press this time, on purpose: a refused run re-arms its own debounce,
-    // so the workout reaching the account is the tab picking itself back up
-    // rather than the button being pressed until it worked. The observer has to
-    // keep asking, because that happens on the other device's schedule.
-    await expect.poll(
-      async () => {
-        await syncNow(observer)
-        return (await visibleSessions(observer)).map(session => session.id)
-      },
-      { message: 'the tab that was refused should sync once the lock is free', timeout: 60_000 },
-    ).toContain(recorded!.id)
+    // No press on the refused tab this time, on purpose: a refused run re-arms
+    // its own debounce, so the workout reaching the account is that tab picking
+    // itself back up rather than the button being pressed until it worked.
+    await expectPushed(
+      observer,
+      recorded!.id,
+      'the tab that was refused should sync once the lock is free',
+    )
 
     await openSession(observer, '1 exercises')
     await expect(entryCard(observer, 'Deadlift')).toContainText('100 kg × 3 reps')
