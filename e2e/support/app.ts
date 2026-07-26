@@ -721,12 +721,28 @@ export async function holdSyncLock (page: Page) {
   )
 }
 
-/** Lets go of the lock {@link holdSyncLock} took. */
+/**
+ * Lets go of the lock {@link holdSyncLock} took, and says so.
+ *
+ * There being a callback to call is asserted rather than shrugged at: if the
+ * page was reloaded it took `window.releaseSyncLock` with it, and an optional
+ * call would report success while the lock stayed held — the test then running
+ * on to fail 60 s later on *"the tab that was refused should sync once the lock
+ * is free"*, a message pointing at the app's re-arm when the cause was the
+ * harness never letting go. Clearing the callback afterwards keeps a second
+ * release from looking like it did something.
+ */
 export async function releaseSyncLock (page: Page) {
-  await page.evaluate(() => {
+  const released = await page.evaluate(() => {
     const holder = window as LockHolder
-    holder.releaseSyncLock?.()
+    if (!holder.releaseSyncLock) {
+      return false
+    }
+    holder.releaseSyncLock()
+    holder.releaseSyncLock = undefined
+    return true
   })
+  expect(released, 'holdSyncLock should have left a lock to release').toBe(true)
 }
 
 /**
