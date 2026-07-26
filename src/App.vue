@@ -37,7 +37,6 @@
           v-else-if="app.snackbar"
           aria-label="Close"
           icon="$close"
-          size="small"
           variant="text"
           @click="dismissSnackbar"
         />
