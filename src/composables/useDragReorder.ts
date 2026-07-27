@@ -61,6 +61,14 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
   let dragId = ''
   /** The pointer's last position, kept so autoscrolling can re-derive the drag. */
   let pointerY = 0
+  /**
+   * Which pointer picked the row up. The listeners are on `window`, so they
+   * hear every pointer on the page, and on a phone there is usually more than
+   * one: a second finger resting on the screen raises its own `pointerup` and
+   * would otherwise drop the row wherever the first finger happened to be, or
+   * a `pointercancel` that would abandon the drag without a word.
+   */
+  let pointerId = -1
   let scrolling: number | undefined
 
   /**
@@ -100,6 +108,7 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
     origin = event.clientY + window.scrollY
     pointerY = event.clientY
     dragId = id
+    pointerId = event.pointerId
     from.value = index
     to.value = index
     offset.value = 0
@@ -111,11 +120,14 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
     handle.setPointerCapture(event.pointerId)
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerup', onPointerUp)
-    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('pointercancel', onPointerCancel)
     window.addEventListener('keydown', onKeyDown)
   }
 
   function onPointerMove (event: PointerEvent) {
+    if (event.pointerId !== pointerId) {
+      return
+    }
     pointerY = event.clientY
     update()
     if (scrollSpeed() === 0) {
@@ -169,13 +181,26 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
     }
   }
 
-  function onPointerUp () {
+  function onPointerUp (event: PointerEvent) {
+    if (event.pointerId !== pointerId) {
+      return
+    }
     const source = from.value
     const target = to.value
     const id = dragId
     finish()
     if (source !== null && target !== source) {
       onDrop(id, target)
+    }
+  }
+
+  /**
+   * The browser taking the gesture away — a system gesture, or the touch
+   * being interrupted. Only the pointer holding the row can end its drag.
+   */
+  function onPointerCancel (event: PointerEvent) {
+    if (event.pointerId === pointerId) {
+      cancel()
     }
   }
 
@@ -194,10 +219,11 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
   function finish () {
     from.value = null
     offset.value = 0
+    pointerId = -1
     stopScrolling()
     window.removeEventListener('pointermove', onPointerMove)
     window.removeEventListener('pointerup', onPointerUp)
-    window.removeEventListener('pointercancel', cancel)
+    window.removeEventListener('pointercancel', onPointerCancel)
     window.removeEventListener('keydown', onKeyDown)
   }
 
