@@ -329,6 +329,12 @@
 
 .action-bar {
   position: fixed;
+  /* Above the row a drag lifts to 2. The page makes no stacking context of its
+     own, so the two are siblings in the same one, and a bar with an automatic
+     z-index would otherwise be painted over by an entry dragged to the bottom
+     of the list — which is exactly where the finger sits while the autoscroll
+     is running. */
+  z-index: 3;
   right: 0;
   /* Above the bottom navigation, then above the home indicator on iOS. */
   bottom: calc(56px + env(safe-area-inset-bottom));
