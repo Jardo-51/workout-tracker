@@ -31,10 +31,13 @@ const SCROLL_STEP = 12
  * passed in, so the index and the geometry can only ever come from the same
  * list.
  *
- * @param onDrop called with indices into the list *before* the move; `to` is
- * counted in the list the item has been taken out of, as `moveItem` expects.
+ * @param onDrop called with the id the picked-up row was marked with, and the
+ * gap it was dropped into counted in the list that row has been taken out of,
+ * as `moveItem` expects. The id is read when the row is picked up, not when it
+ * lands: a drag spans seconds, and by the end of one the index it started from
+ * may well name a different row.
  */
-export function useDragReorder (onDrop: (from: number, to: number) => void) {
+export function useDragReorder (onDrop: (id: string, to: number) => void) {
   /** Which row is in the air, or null when nothing is being dragged. */
   const from = ref<number | null>(null)
   /** Which gap it would drop into if the finger came up now. */
@@ -51,6 +54,11 @@ export function useDragReorder (onDrop: (from: number, to: number) => void) {
   let midpoints: number[] = []
   /** Where the pointer went down, in document coordinates. */
   let origin = 0
+  /**
+   * What the picked-up row was marked with, read at pickup and handed back at
+   * the drop so the caller never has to re-read the row from an index.
+   */
+  let dragId = ''
   /** The pointer's last position, kept so autoscrolling can re-derive the drag. */
   let pointerY = 0
   let scrolling: number | undefined
@@ -75,7 +83,8 @@ export function useDragReorder (onDrop: (from: number, to: number) => void) {
     }
     const items = [...list.querySelectorAll<HTMLElement>(':scope > [data-drag-item]')]
     const index = items.indexOf(item)
-    if (index === -1) {
+    const id = item.dataset.dragId
+    if (index === -1 || id === undefined) {
       return
     }
 
@@ -90,6 +99,7 @@ export function useDragReorder (onDrop: (from: number, to: number) => void) {
     step.value = rect.height + Number.parseFloat(getComputedStyle(item).marginBottom)
     origin = event.clientY + window.scrollY
     pointerY = event.clientY
+    dragId = id
     from.value = index
     to.value = index
     offset.value = 0
@@ -162,9 +172,10 @@ export function useDragReorder (onDrop: (from: number, to: number) => void) {
   function onPointerUp () {
     const source = from.value
     const target = to.value
+    const id = dragId
     finish()
     if (source !== null && target !== source) {
-      onDrop(source, target)
+      onDrop(id, target)
     }
   }
 
@@ -217,17 +228,18 @@ export function useDragReorder (onDrop: (from: number, to: number) => void) {
 
   /**
    * Everything a row in the list needs: the marker `start` finds it by, the
-   * classes that lift it and let the others slide, and its transform. Bound in
-   * one go with `v-bind`.
+   * id it is named by once it is in the air, the classes that lift it and let
+   * the others slide, and its transform. Bound in one go with `v-bind`.
    *
    * The sliding transition is only on while a drag is in flight. At the drop
    * the transforms all fall away in the same tick as the reordered list is
    * rendered, and animating that would mean animating rows away from where
    * their new content already is.
    */
-  function itemAttrs (index: number) {
+  function itemAttrs (index: number, id: string) {
     return {
       'data-drag-item': '',
+      'data-drag-id': id,
       'class': {
         'drag-item--lifted': index === from.value,
         'drag-item--sliding': from.value !== null && index !== from.value,

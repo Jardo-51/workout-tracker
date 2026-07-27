@@ -60,20 +60,20 @@
     <template v-for="(entry, index) in session.entries" :key="entry.id">
       <WorkoutEntryCard
         v-if="entry.kind === 'workout'"
-        v-bind="drag.itemAttrs(index)"
+        v-bind="drag.itemAttrs(index, entry.id)"
         :entry="entry"
         @edit="openWorkoutEdit(entry)"
-        @grab="drag.start"
+        @grab="grabEntry"
         @history="openHistory(entry.name)"
         @move="nudgeEntry(index, $event)"
       />
 
       <BreakEntryRow
         v-else
-        v-bind="drag.itemAttrs(index)"
+        v-bind="drag.itemAttrs(index, entry.id)"
         :entry="entry"
         @edit="openBreakEdit(entry)"
-        @grab="drag.start"
+        @grab="grabEntry"
         @move="nudgeEntry(index, $event)"
       />
     </template>
@@ -210,19 +210,43 @@
       : store.updateEntry(session.value.id, entry))
   }
 
-  const drag = useDragReorder((from, to) => void moveEntry(from, to))
+  const drag = useDragReorder(dropEntry)
 
-  /** The keyboard way through the drag handle: one place up or down. */
-  function nudgeEntry (index: number, delta: number) {
-    void moveEntry(index, index + delta)
+  /**
+   * The entries as they stood when the drag currently in flight picked its row
+   * up. Everything the drop is decided from was measured against that list —
+   * the midpoints, and so the gap the finger ends up over — and a drag lasts
+   * seconds, long enough for a sync or another tab to have replaced the
+   * entries underneath it. Applying a gap counted in a list that no longer
+   * exists would reorder whatever happens to be there now, so the move is
+   * dropped instead. Both of those paths swap in a whole new session object,
+   * which is why comparing the array is enough to notice.
+   */
+  let entriesAtPickup: SessionEntry[] | undefined
+
+  function grabEntry (event: PointerEvent) {
+    entriesAtPickup = session.value?.entries
+    drag.start(event)
   }
 
-  async function moveEntry (from: number, to: number) {
-    const entry = session.value?.entries[from]
+  function dropEntry (entryId: string, to: number) {
+    if (!session.value || session.value.entries !== entriesAtPickup) {
+      return
+    }
+    void store.moveEntry(session.value.id, entryId, to)
+  }
+
+  /**
+   * The keyboard way through the drag handle: one place up or down. This one
+   * reads the entry out of the index in the same tick the key was pressed, so
+   * there is no window for the list to change under it.
+   */
+  function nudgeEntry (index: number, delta: number) {
+    const entry = session.value?.entries[index]
     if (!session.value || !entry) {
       return
     }
-    await store.moveEntry(session.value.id, entry.id, to)
+    void store.moveEntry(session.value.id, entry.id, index + delta)
   }
 
   async function removeEntry (entryId: string) {
