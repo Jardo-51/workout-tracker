@@ -170,9 +170,9 @@ syncedDescribe('sync between two devices', account => {
     // precached by `VitePWA`'s `globPatterns` (`vite.config.mts`), and the page
     // being reloaded is `/settings` — wherever `syncNow` last navigated — so
     // this leans on the navigate fallback and the lazily-loaded settings chunk
-    // being in that precache too. If precaching ever regresses, this line is
-    // where it shows up, as `net::ERR_INTERNET_DISCONNECTED` in a sync test
-    // that says nothing about service workers.
+    // being in that precache too. It relies on that rather than checking it:
+    // `pwa.spec.ts` is where a precache that stopped covering them fails by
+    // name, and without needing a server.
     await deviceA.reload()
     await openHome(deviceA)
     // Offline and freshly started, the workout is still there: it was written

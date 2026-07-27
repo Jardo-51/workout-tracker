@@ -15,6 +15,8 @@ import { SYNC_LOCK } from '../../src/services/broadcast'
  * shows and nothing in a test can time.
  *
  * A fifth wants that same argument, not just convenience.
+ * {@link serviceWorkerReady} is not one: it asks the browser about the browser,
+ * and no test asserts on its answer.
  */
 
 /** Shape of an export file, as `services/backup.ts` writes it. */
@@ -87,6 +89,35 @@ export async function openApp (page: Page) {
   // Specifically the start button, not `openHome`'s either/or: a test opens the
   // app on an empty device, where a session cannot already be under way.
   await expect(startButton(page)).toBeVisible()
+}
+
+/**
+ * Waits until this page is being served *through* the service worker, which is
+ * what has to be true before a test may cut the network.
+ *
+ * `controller` is the whole condition, and it says more than "a worker
+ * exists". A worker only reaches the point of controlling a page by activating,
+ * and `VitePWA`'s generated `sw.js` only activates once its install step has
+ * written the precache — the build's HTML, JS, CSS, icons and fonts — to disk.
+ * So a non-null controller means the files the app would otherwise ask the
+ * network for are already on the device.
+ *
+ * It has to be waited for rather than assumed: `registerSW.js` registers on the
+ * window's `load` event, and installing a precache of this size takes long
+ * enough that a test going offline straight after the first paint would beat
+ * it, and then fail at the reload with `net::ERR_INTERNET_DISCONNECTED` — a
+ * race, not a regression.
+ *
+ * The wait is `clientsClaim`'s doing (`registerType: 'autoUpdate'` sets it): a
+ * first-ever worker would otherwise control nothing until the next navigation,
+ * and this would hang on a healthy app.
+ */
+export async function serviceWorkerReady (page: Page) {
+  await page.waitForFunction(
+    () => navigator.serviceWorker.controller !== null,
+    undefined,
+    { timeout: 30_000 },
+  )
 }
 
 /**
