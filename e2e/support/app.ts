@@ -113,11 +113,19 @@ export async function openApp (page: Page) {
  * and this would hang on a healthy app.
  */
 export async function serviceWorkerReady (page: Page) {
+  // 30 s: an install of this precache is a fraction of a second locally, so
+  // anything near this is a worker that is never going to activate.
   await page.waitForFunction(
     () => navigator.serviceWorker.controller !== null,
     undefined,
     { timeout: 30_000 },
-  )
+  ).catch(() => {
+    throw new Error(
+      'No service worker took control of the page, so the precache was never '
+      + 'written — an asset in `globPatterns` that cannot be fetched fails the '
+      + 'install step and the worker never activates.',
+    )
+  })
 }
 
 /**
