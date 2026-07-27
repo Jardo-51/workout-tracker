@@ -1,13 +1,19 @@
 {
   "extends": "@tsconfig/node22/tsconfig.json",
-  // Two app files come along, for the same reason in both cases: a test that
-  // reads IndexedDB should be held to what the app actually writes, rather
+  // Three app files come along, for the same reason in each case: a test that
+  // reaches past the UI should be held to what the app actually uses, rather
   // than to a copy of it. `workout.ts` is the shape of a stored session;
   // `db.constants.ts` is the prefix a logout clears out of the `meta` store,
-  // which a test asserting that it is gone has to name. Neither can come in as
-  // a project reference: tsconfig.app.json disables emit, which a referenced
-  // project may not do.
-  "include": ["e2e/**/*", "src/types/workout.ts", "src/services/db.constants.ts"],
+  // which a test asserting that it is gone has to name; `broadcast.ts` is the
+  // Web Lock name, which the multi-tab test takes for itself to hold one tab's
+  // sync still. None can come in as a project reference: tsconfig.app.json
+  // disables emit, which a referenced project may not do.
+  "include": [
+    "e2e/**/*",
+    "src/types/workout.ts",
+    "src/services/db.constants.ts",
+    "src/services/broadcast.ts"
+  ],
   "compilerOptions": {
     "composite": true,
     "noEmit": true,

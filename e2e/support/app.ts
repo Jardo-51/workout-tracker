@@ -1,17 +1,20 @@
 import type { Session, Tempo, WeightUnit } from '../../src/types/workout'
 import fs from 'node:fs/promises'
 import { type Browser, expect, type Locator, type Page } from '@playwright/test'
+import { SYNC_LOCK } from '../../src/services/broadcast'
 
 /**
  * Driving the app the way a user does: the bottom nav, the buttons, the
- * dialogs. Three helpers reach into the app's internals, all for the same
- * reason — "what is actually on the device" is the thing those tests are about,
- * and it has no visible form: {@link storedSessions}, because the difference
- * between a tombstone and a removed row is invisible on screen, and
+ * dialogs. Four reaches past that, all for the same reason — the thing those
+ * tests are about has no form on screen: {@link storedSessions}, because the
+ * difference between a tombstone and a removed row is invisible;
  * {@link storedKeys} and {@link storedSyncState}, because what a logout leaves
- * behind is what a later login would push at whatever account it is given.
+ * behind is what a later login would push at whatever account it is given; and
+ * {@link holdSyncLock} with {@link releaseSyncLock}, one reach taken and given
+ * back, because "another tab is already syncing" is a state nothing on screen
+ * shows and nothing in a test can time.
  *
- * A fourth wants that same argument, not just convenience.
+ * A fifth wants that same argument, not just convenience.
  */
 
 /** Shape of an export file, as `services/backup.ts` writes it. */
@@ -35,6 +38,48 @@ export async function openDevice (browser: Browser): Promise<Page> {
   const page = await context.newPage()
   await openApp(page)
   return page
+}
+
+/**
+ * A second tab of the same device: another page in the same context, so the
+ * same IndexedDB, the same localStorage and the same `BroadcastChannel`.
+ * {@link openDevice} is the other half of the pair — two of those are two
+ * devices, two of these are two tabs, and only the second kind can hear a
+ * broadcast.
+ *
+ * Comes back only once this tab is *listening*, which is the one property it
+ * exists to provide: `stores/sessions.ts` registers `onSessionChanged` and
+ * `onDataReplaced` at the end of its load, so until that load resolves the
+ * channel has not even been constructed and a message sent at this tab is
+ * dropped for good — there is no replay.
+ *
+ * {@link loadedHome} is what says the load resolved. Home's start button is
+ * rendered before it and so cannot: a wait on that alone would hand back a tab
+ * that hears nothing, and the caller would find out one flaky run in ten.
+ */
+export async function openTab (page: Page): Promise<Page> {
+  const tab = await page.context().newPage()
+  await tab.goto('/')
+  await expect(loadedHome(tab)).toBeVisible()
+  return tab
+}
+
+/**
+ * Whichever part of Home only appears once the sessions store has finished
+ * reading IndexedDB — the resume card, a row in *Previous sessions*, or the
+ * *No workouts yet* placeholder, which `HomePage.vue` holds back until then for
+ * the same reason. One of the three is showing in every state the app can be
+ * in, and none of them before the load.
+ *
+ * `first()` because two of them can be up at once — a session under way and
+ * earlier ones below it — and a union matching twice is a strict-mode failure
+ * rather than the wait it was asked for.
+ */
+function loadedHome (page: Page) {
+  return resumeCard(page)
+    .or(sessionRow(page))
+    .or(page.getByText('No workouts yet'))
+    .first()
 }
 
 export async function openApp (page: Page) {
@@ -603,17 +648,15 @@ const SYNC_ATTEMPTS = 5
  * Anything else — no message at all — means the run failed, and the sync card's
  * own error alert says why; the presses stop after {@link SYNC_ATTEMPTS} rather
  * than spending the test's whole budget on a server that is not answering.
+ *
+ * Each attempt is a whole {@link pressSyncNow}, Settings and all, so the caller
+ * can be anywhere in the app and a retry starts from the same place the first
+ * press did.
  */
 export async function syncNow (page: Page) {
-  await openSettings(page)
-  const button = page.getByRole('button', { name: 'Sync now' })
   const answer = snackbar(page).filter({ hasText: /Synced|You are offline/ })
   for (let attempt = 0; attempt < SYNC_ATTEMPTS; attempt++) {
-    await settle(page)
-    // Pressing into a run that is already going is the swallowed press itself.
-    await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
-    await button.click()
-    await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+    await pressSyncNow(page)
     const answered = await answer.waitFor({ timeout: 5000 }).then(() => true, () => false)
     if (answered) {
       return
@@ -623,6 +666,120 @@ export async function syncNow (page: Page) {
     `Sync now was pressed ${SYNC_ATTEMPTS} times and no sync ran — `
     + 'the Etesync card\'s error alert says why.',
   )
+}
+
+/**
+ * One press of *Sync now*, waiting only for the button to come back — not for
+ * the app to say a run happened.
+ *
+ * {@link syncNow} is what a test that needs a sync to have run wants; this is
+ * for the one test that is about a press being *refused*, while another tab
+ * holds the sync lock. There the acknowledgement never comes, so pressing
+ * through that helper would spend five attempts and then throw.
+ *
+ * Navigating to Settings is part of the press rather than something the caller
+ * arranges, which is what lets {@link syncNow} retry by simply calling this
+ * again. `openSettings` settles the screen on its way through, so nothing more
+ * is needed before the click: a snackbar cannot arrive in the gap between the
+ * two, and settling twice per press cost every retry a wait for nothing.
+ */
+export async function pressSyncNow (page: Page) {
+  await openSettings(page)
+  const button = page.getByRole('button', { name: 'Sync now' })
+  // Pressing into a run that is already going is the swallowed press itself.
+  await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+  await button.click()
+  await expect(button).not.toHaveClass(/v-btn--loading/, { timeout: 60_000 })
+}
+
+/** Where {@link holdSyncLock} parks the callback that ends the lock it took. */
+type LockHolder = Window & { releaseSyncLock?: () => void }
+
+/**
+ * Takes the Web Lock a sync run holds, from the page's own JS — which is
+ * exactly what a tab in the middle of a sync is doing.
+ *
+ * The fourth reach past the UI, and for the same reason as the other three:
+ * "another tab is already syncing" is a state with no form on screen at all.
+ * Nor can a real one be used — a run against a local server is over in
+ * milliseconds, so there is no window for a second tab to press into, and a
+ * test that tried would be a coin toss. Held here, the state stays put for as
+ * long as the assertions need it.
+ *
+ * Resolves once the lock is actually held, which means waiting out a sync that
+ * is already running; the {@link SYNC_LOCK} name is imported so the app and
+ * this cannot drift apart.
+ *
+ * A rejected request is forwarded rather than dropped — `withSyncLock` in
+ * `services/broadcast.ts` guards for `navigator.locks` being missing at all,
+ * and a `SecurityError` is the other way this can fail. Left as `void`, either
+ * would hang here until the test's own 180 s ran out and report itself as
+ * *"Test timeout exceeded"*, which says nothing about locks. The `catch` costs
+ * nothing on the happy path: by the time the lock is released the promise below
+ * has long since settled at `granted()`.
+ */
+export async function holdSyncLock (page: Page) {
+  await page.evaluate(
+    name => new Promise<void>((granted, failed) => {
+      navigator.locks.request(name, () => new Promise<void>(release => {
+        const holder = window as LockHolder
+        holder.releaseSyncLock = release
+        granted()
+      })).catch(failed)
+    }),
+    SYNC_LOCK,
+  )
+}
+
+/**
+ * Lets go of the lock {@link holdSyncLock} took, and says so.
+ *
+ * There being a callback to call is asserted rather than shrugged at: if the
+ * page was reloaded it took `window.releaseSyncLock` with it, and an optional
+ * call would report success while the lock stayed held — the test then running
+ * on to fail 60 s later on *"the tab that was refused should sync once the lock
+ * is free"*, a message pointing at the app's re-arm when the cause was the
+ * harness never letting go. Clearing the callback afterwards keeps a second
+ * release from looking like it did something.
+ */
+export async function releaseSyncLock (page: Page) {
+  const released = await page.evaluate(() => {
+    const holder = window as LockHolder
+    if (!holder.releaseSyncLock) {
+      return false
+    }
+    holder.releaseSyncLock()
+    holder.releaseSyncLock = undefined
+    return true
+  })
+  expect(released, 'holdSyncLock should have left a lock to release').toBe(true)
+}
+
+/**
+ * Waits for a session recorded elsewhere to reach `observer`, by id.
+ *
+ * The observer has to keep asking, which is what makes this a poll around a
+ * whole sync rather than a wait on anything: the tests that want this are the
+ * ones where the *other* device pushes on its own schedule — an `online`
+ * listener firing, or a refused run re-arming its debounce — and pressing
+ * *Sync now* over there would make them pass whether or not the thing under
+ * test exists. Nothing on either device announces the moment it happens, so the
+ * only question that can be asked is "is it there yet".
+ *
+ * `message` is what the report shows when it never arrives, so it should name
+ * the mechanism the test is about. Sixty seconds of asking is what a caller is
+ * buying, which is why both of them raise their own budget to 180 s: this
+ * message has to be what runs out first, rather than *"Test timeout
+ * exceeded"*, which would say nothing about what was being waited for.
+ */
+export async function expectPushed (observer: Page, sessionId: string, message: string) {
+  await expect.poll(
+    async () => {
+      await syncNow(observer)
+      return (await visibleSessions(observer)).map(session => session.id)
+    },
+    { message, timeout: 60_000 },
+  ).toContain(sessionId)
 }
 
 /**

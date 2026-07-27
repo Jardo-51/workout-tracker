@@ -3,6 +3,7 @@ import {
   deleteNewestWorkout,
   emptyTheAccount,
   entryCard,
+  expectPushed,
   fillWorkoutValues,
   logIn,
   openDevice,
@@ -126,13 +127,10 @@ syncedDescribe('sync between two devices', account => {
   })
 
   test('pushes a workout recorded offline once the connection is back', async ({ browser }) => {
-    // Above the suite's 120 s, because the poll at the end is allowed 60 of
-    // them and everything before it — two logins, an emptying of the account, a
-    // recorded workout, a refused sync, a reload — can eat the rest. In the
-    // failure this test exists to catch the poll has to be what runs out, so
-    // that its message is what the report shows: on the global timeout the
-    // reader gets "Test timeout of 120000ms exceeded" and nothing about the
-    // `online` listener that was being asserted on.
+    // Above the suite's 120 s: `expectPushed` at the end is allowed 60 of them
+    // — see its own comment for why it has to be what runs out — and everything
+    // before it, two logins, an emptying of the account, a recorded workout, a
+    // refused sync and a reload, can eat the rest.
     test.setTimeout(180_000)
 
     const deviceA = await openDevice(browser)
@@ -185,15 +183,11 @@ syncedDescribe('sync between two devices', account => {
 
     // Deliberately without touching *Sync now* on A: the `online` listener in
     // `stores/sync.ts` is the thing under test, and pressing the button would
-    // pass whether or not it exists. B is only the observer — it has to keep
-    // asking, because A's flush happens on its own schedule.
-    await expect.poll(
-      async () => {
-        await syncNow(deviceB)
-        return (await visibleSessions(deviceB)).map(session => session.id)
-      },
-      { message: 'device A should push what it recorded offline', timeout: 60_000 },
-    ).toEqual([recorded!.id])
+    // pass whether or not it exists. B is only the observer.
+    await expectPushed(deviceB, recorded!.id, 'device A should push what it recorded offline')
+    // And only that one: B started empty and A recorded a single workout, so
+    // anything else here would be the flush pushing more than it was given.
+    expect(await visibleSessions(deviceB)).toHaveLength(1)
 
     await openSession(deviceB, '1 exercises')
     await expect(entryCard(deviceB, 'Pull-up')).toContainText('8 reps')

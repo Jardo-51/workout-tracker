@@ -1,5 +1,11 @@
 const CHANNEL_NAME = 'workout-tracker'
-const SYNC_LOCK = 'workout-tracker.sync'
+
+/**
+ * The Web Lock a sync run holds, exported because the e2e suite holds it
+ * itself: catching a real second tab mid-run is not something a test can time,
+ * and a name written out again over there would drift the day this one changes.
+ */
+export const SYNC_LOCK = 'workout-tracker.sync'
 
 interface SessionChangedMessage {
   type: 'session-changed'

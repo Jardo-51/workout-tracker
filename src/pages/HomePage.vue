@@ -77,8 +77,13 @@
       </v-card>
     </template>
 
+    <!-- `store.loaded` and not just an empty list: the sessions are read out of
+         IndexedDB after the first render, so without it a returning user is
+         told they have no workouts for as long as that read takes. It also
+         makes this the one thing on Home that says the store has loaded, which
+         is what `openTab` in the e2e helpers waits for. -->
     <div
-      v-else-if="!store.activeSession"
+      v-else-if="!store.activeSession && store.loaded"
       class="text-center text-medium-emphasis mt-16"
     >
       <v-icon class="mb-4" icon="$dumbbell" size="64" />
