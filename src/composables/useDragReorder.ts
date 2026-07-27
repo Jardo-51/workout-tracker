@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'vue'
-import { onScopeDispose, readonly, ref } from 'vue'
+import { onScopeDispose, ref } from 'vue'
 import { dropIndex } from '@/utils/reorder'
 
 /**
@@ -287,5 +287,5 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
     }
   }
 
-  return { dragging: readonly(from), itemAttrs, start }
+  return { itemAttrs, start }
 }
