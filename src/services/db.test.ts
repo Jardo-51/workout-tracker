@@ -81,6 +81,51 @@ function abortAfterRequest (n: number): void {
   /* eslint-enable unicorn/no-this-outside-of-class */
 }
 
+type RejectionListener = (reason: unknown, promise: Promise<unknown>) => void
+
+// The app's tsconfig deliberately keeps the Node globals out of `src`, so the
+// one Node API this file needs is reached through `globalThis` and described
+// here rather than pulled in project-wide.
+const nodeProcess = (globalThis as unknown as {
+  process: {
+    listeners: (event: 'unhandledRejection') => RejectionListener[]
+    removeAllListeners: (event: 'unhandledRejection') => void
+    on: (event: 'unhandledRejection', listener: RejectionListener) => void
+    off: (event: 'unhandledRejection', listener: RejectionListener) => void
+  }
+}).process
+
+/**
+ * Runs `run` with this file's own `unhandledRejection` listener in place of
+ * the runner's, and returns whatever went unobserved.
+ *
+ * An abort rejects every write still in flight *and* `tx.done`, so the promise
+ * nobody awaits becomes an unhandled rejection — which vitest reports as
+ * `Unhandled Errors` beside a passing test rather than as a failure, and which
+ * `dangerouslyIgnoreUnhandledErrors` would silence entirely. Taking the
+ * listener over turns that side channel into an assertion the rollback tests
+ * can make directly.
+ */
+async function withUnhandledRejections (run: () => Promise<void>): Promise<unknown[]> {
+  const caught: unknown[] = []
+  const capture = (reason: unknown): void => void caught.push(reason)
+  const runners = nodeProcess.listeners('unhandledRejection')
+  nodeProcess.removeAllListeners('unhandledRejection')
+  nodeProcess.on('unhandledRejection', capture)
+  try {
+    await run()
+    // Node only decides a rejection is unhandled after the microtask queue has
+    // drained, which is later than the awaited call settling.
+    await new Promise(resolve => setTimeout(resolve, 0))
+  } finally {
+    nodeProcess.off('unhandledRejection', capture)
+    for (const runner of runners) {
+      nodeProcess.on('unhandledRejection', runner)
+    }
+  }
+  return caught
+}
+
 describe('sessions round trip', () => {
   it('reads back what was written, tombstones included', async () => {
     const live = makeSession('a', { endTime: 5000, note: 'legs' })
@@ -129,12 +174,21 @@ describe('replaceAllSessions', () => {
     // Request 2 is the put of 'x', so 'x' is written and 'y' never is.
     abortAfterRequest(2)
 
-    await expect(db.replaceAllSessions([makeSession('x'), makeSession('y')])).rejects.toThrow()
+    const unhandled = await withUnhandledRejections(async () => {
+      await expect(db.replaceAllSessions([makeSession('x'), makeSession('y')])).rejects.toThrow()
+    })
 
     // The store holds neither, and holds exactly what it held before. This is
     // the promise `importSessions` and `clearAllSessions` both await: whatever
     // they were replacing is still there to be shown to the user.
     expect(await db.getAllSessions()).toEqual(before)
+    // The rollback above is true of any single transaction and was true before
+    // `tx.done` joined the `Promise.all`; this is the half that was not. The
+    // abort rejects the writes and `tx.done` alike, so the caller has to be
+    // listening to all of them — an import that hits the storage quota
+    // otherwise logs an AbortError nobody asked for beside the error it does
+    // report.
+    expect(unhandled).toEqual([])
   })
 
   it('has still committed nothing, the clear included, at the last write', async () => {
@@ -144,16 +198,23 @@ describe('replaceAllSessions', () => {
     // transaction does has run when the abort arrives.
     abortAfterRequest(3)
 
-    await expect(db.replaceAllSessions([makeSession('x'), makeSession('y')])).rejects.toThrow()
+    const unhandled = await withUnhandledRejections(async () => {
+      await expect(db.replaceAllSessions([makeSession('x'), makeSession('y')])).rejects.toThrow()
+    })
 
     // The clear and the puts have to be one transaction, and the clear is the
-    // half that is easy to lose: a transaction commits as soon as it has no
-    // pending request and control returns to the event loop, so a clear
-    // awaited on its own can be durable long before the last put is issued.
-    // Had that happened, this would be a store holding 'x' and nothing else —
-    // the half written mix the single transaction exists to prevent, on the
-    // path where the user can least recover from it.
+    // half that is easy to lose: in a browser a transaction commits as soon as
+    // it has no pending request and control returns to the event loop, so a
+    // clear awaited on its own can be durable long before the last put is
+    // issued, leaving a store holding 'x' and nothing else.
+    //
+    // That timing is what this test cannot reach: fake-indexeddb resolves
+    // request promises in a microtask, so the puts always win the race back
+    // and an awaited clear rolls back here too. What is pinned is the weaker,
+    // still worthwhile claim — the clear is inside the same transaction as the
+    // last put, so nothing at all is durable when that put is undone.
     expect(await db.getAllSessions()).toEqual(before)
+    expect(unhandled).toEqual([])
   })
 
   it('leaves the store intact when serializing the argument throws', async () => {
