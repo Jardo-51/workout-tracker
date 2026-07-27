@@ -82,11 +82,15 @@ function rawDelete (): Promise<void> {
  * than on the call means the request has really been applied by the time the
  * abort has to undo it.
  *
- * The failure has to be injected. `toPlain` is a JSON round trip
- * (`db.ts:136-139`), so no value handed to `replaceAllSessions` can fail the
- * structured clone that would otherwise be the way to break a write.
+ * Returns a reader for the number of requests seen, so a test can prove the
+ * abort was armed at all rather than trusting a positional count that shifts
+ * the moment `replaceAllSessions` issues another request.
+ *
+ * The failure has to be injected. `toPlain` is a JSON round trip, so no value
+ * that survives `JSON.stringify` can fail the structured clone that would
+ * otherwise be the way to break a write.
  */
-function abortAfterRequest (n: number): void {
+function abortAfterRequest (n: number): () => number {
   let issued = 0
   function abortIfNth (request: IDBRequest): IDBRequest {
     issued++
@@ -113,6 +117,8 @@ function abortAfterRequest (n: number): void {
     return abortIfNth(put.apply(this, args))
   })
   /* eslint-enable unicorn/no-this-outside-of-class */
+
+  return () => issued
 }
 
 type RejectionListener = (reason: unknown, promise: Promise<unknown>) => void
@@ -248,7 +254,7 @@ describe('replaceAllSessions', () => {
     const before = [makeSession('a'), makeSession('b')]
     await seed(...before)
     // Request 2 is the put of 'x', so 'x' is written and 'y' never is.
-    abortAfterRequest(2)
+    const seen = abortAfterRequest(2)
 
     const unhandled = await withUnhandledRejections(async () => {
       await expect(db.replaceAllSessions([makeSession('x'), makeSession('y')])).rejects.toThrow()
@@ -258,6 +264,9 @@ describe('replaceAllSessions', () => {
     // the promise `importSessions` and `clearAllSessions` both await: whatever
     // they were replacing is still there to be shown to the user.
     expect(await db.getAllSessions()).toEqual(before)
+    // Without this the test would still pass if the call never got as far as
+    // request 2 and the rejection came from somewhere else entirely.
+    expect(seen()).toBeGreaterThanOrEqual(2)
     // The rollback above is true of any single transaction and was true before
     // `tx.done` joined the `Promise.all`; this is the half that was not. The
     // abort rejects the writes and `tx.done` alike, so the caller has to be
@@ -272,7 +281,7 @@ describe('replaceAllSessions', () => {
     await seed(...before)
     // Request 3 is the put of 'y', the last one the call makes: everything the
     // transaction does has run when the abort arrives.
-    abortAfterRequest(3)
+    const seen = abortAfterRequest(3)
 
     const unhandled = await withUnhandledRejections(async () => {
       await expect(db.replaceAllSessions([makeSession('x'), makeSession('y')])).rejects.toThrow()
@@ -290,6 +299,9 @@ describe('replaceAllSessions', () => {
     // still worthwhile claim — the clear is inside the same transaction as the
     // last put, so nothing at all is durable when that put is undone.
     expect(await db.getAllSessions()).toEqual(before)
+    // The abort has to have been armed on the last request the call makes, not
+    // on a position the call no longer reaches.
+    expect(seen()).toBe(3)
     expect(unhandled).toEqual([])
   })
 
