@@ -12,6 +12,7 @@ import {
   openSession,
   recordWorkout,
   saveEntry,
+  serviceWorkerReady,
   sessionRow,
   snackbar,
   storedSessions,
@@ -140,6 +141,12 @@ syncedDescribe('sync between two devices', account => {
     await emptyTheAccount(deviceA)
     await logIn(deviceB, account)
 
+    // The worker has to have taken control before the network goes, because
+    // the reload below is served out of its precache: cutting the connection
+    // while the install is still running would fail there with
+    // `net::ERR_INTERNET_DISCONNECTED` — a race, not a regression. The logins
+    // above usually buy it enough time, and "usually" is what this removes.
+    await serviceWorkerReady(deviceA)
     await deviceA.context().setOffline(true)
     await recordWorkout(deviceA, 'Pull-up', { reps: 8 })
     const [recorded] = await visibleSessions(deviceA)
@@ -170,9 +177,9 @@ syncedDescribe('sync between two devices', account => {
     // precached by `VitePWA`'s `globPatterns` (`vite.config.mts`), and the page
     // being reloaded is `/settings` — wherever `syncNow` last navigated — so
     // this leans on the navigate fallback and the lazily-loaded settings chunk
-    // being in that precache too. If precaching ever regresses, this line is
-    // where it shows up, as `net::ERR_INTERNET_DISCONNECTED` in a sync test
-    // that says nothing about service workers.
+    // being in that precache too. It relies on that rather than checking it:
+    // `pwa.spec.ts` is where a precache that stopped covering them fails by
+    // name, and without needing a server.
     await deviceA.reload()
     await openHome(deviceA)
     // Offline and freshly started, the workout is still there: it was written

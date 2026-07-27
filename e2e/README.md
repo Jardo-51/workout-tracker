@@ -59,6 +59,14 @@ two pages in one context, sharing an IndexedDB, which is what
 and a clear or an import emptying and refilling it need no server; the third
 test, that a tab already syncing stops another from starting, does.
 
+`pwa.spec.ts` is the one file about the service worker: the network goes down
+and the app still reloads, routes between all three of its lazily-loaded pages
+and answers a cold `/settings` out of the navigate fallback. Every assertion in
+it passes with the worker deleted as long as the network is up, which is why it
+cuts it. The offline reload in `sync.spec.ts` leans on the same precache, but
+that test is about the sync that follows and it needs a server, so a default
+run would leave precaching unchecked.
+
 `backup.spec.ts` runs on a device with sync switched off and needs nothing but
 the app. `sync.spec.ts` and `sync-backup.spec.ts` drive two browser contexts as
 two devices against a real Etesync server, and **skip themselves** unless one is
@@ -128,6 +136,10 @@ sessions the test itself made, by id.
   syncing" is invisible *and* untimeable, a run against a local server being
   over in milliseconds, so a second tab has no window to be caught in. A fifth
   needs the same kind of argument, not merely that reaching in is easier.
+  `serviceWorkerReady` is not one of them and is not a precedent for one: it
+  reads `navigator.serviceWorker`, the browser rather than the app, and nothing
+  is asserted on what it returns — it is the wait that makes cutting the
+  network a test instead of a race.
 - Assert with `expect`, which retries. No sleeps: waiting for a sync means
   waiting for the button to stop loading, not for four seconds to pass.
 - Snackbars sit over the bottom nav and swallow clicks aimed at it — the
