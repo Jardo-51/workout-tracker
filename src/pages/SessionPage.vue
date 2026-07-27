@@ -78,6 +78,11 @@
       />
     </template>
 
+    <!-- Where an entry ended up after an arrow key moved it. A drag can be
+         watched; a keyboard move cannot, and focus stays on the same handle
+         afterwards, so without this the entry travels in silence. -->
+    <div aria-live="polite" class="visually-hidden">{{ moveAnnouncement }}</div>
+
     <div
       v-if="session.entries.length === 0"
       class="text-center text-medium-emphasis mt-12 mb-4"
@@ -236,17 +241,26 @@
     void store.moveEntry(session.value.id, entryId, to)
   }
 
+  const moveAnnouncement = ref('')
+
   /**
    * The keyboard way through the drag handle: one place up or down. This one
    * reads the entry out of the index in the same tick the key was pressed, so
    * there is no window for the list to change under it.
    */
-  function nudgeEntry (index: number, delta: number) {
-    const entry = session.value?.entries[index]
-    if (!session.value || !entry) {
+  async function nudgeEntry (index: number, delta: number) {
+    const moved = session.value
+    const entry = moved?.entries[index]
+    if (!moved || !entry) {
       return
     }
-    void store.moveEntry(session.value.id, entry.id, index + delta)
+    await store.moveEntry(moved.id, entry.id, index + delta)
+    // Read back rather than assumed: the store refuses to move an entry off
+    // either end of the list, and at the ends the truthful thing to say is
+    // that it is still where it was.
+    const position = moved.entries.findIndex(e => e.id === entry.id) + 1
+    const name = entry.kind === 'workout' ? entry.name : 'Break'
+    moveAnnouncement.value = `${name}, position ${position} of ${moved.entries.length}`
   }
 
   async function removeEntry (entryId: string) {
@@ -300,6 +314,17 @@
 
 .drag-item--sliding {
   transition: transform 150ms ease;
+}
+
+/* In the accessibility tree and nowhere else. `display: none` would take it
+   out of both, and a live region nobody can reach announces nothing. */
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .action-bar {

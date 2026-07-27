@@ -239,9 +239,12 @@ export function breakRow (page: Page, duration: string) {
  * The reorder handle of one entry, exercise or break alike — named after what
  * it moves, which for a break is the same `Break — 45 s` its row reads as.
  * That is a different button from the row itself: the name here is prefixed.
+ * The suffix is the handle telling a screen reader which keys work on it, and
+ * is matched here so the exact name keeps one entry's handle from matching
+ * another whose name starts the same way.
  */
 export function dragHandle (page: Page, entry: string) {
-  return page.getByRole('button', { name: `Reorder ${entry}`, exact: true })
+  return page.getByRole('button', { name: `Reorder ${entry}, use arrow keys`, exact: true })
 }
 
 /**

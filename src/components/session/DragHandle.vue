@@ -1,7 +1,11 @@
 <template>
+  <!-- The arrow keys are named in the label because nothing else can say them:
+       this announces itself as a button, and buttons promise that Enter and
+       Space do something, which here they deliberately do not. The keys that
+       do are otherwise there to be guessed at. -->
   <v-btn
     ref="button"
-    :aria-label="`Reorder ${label}`"
+    :aria-label="`Reorder ${label}, use arrow keys`"
     class="drag-handle"
     density="comfortable"
     icon="$drag"
