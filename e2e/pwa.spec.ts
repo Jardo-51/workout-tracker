@@ -23,7 +23,7 @@ import {
  * This one is about the precache itself and needs nothing but the app.
  */
 test.describe('the app with the network down', () => {
-  test('reloads, routes and reads its workouts from the precache', async ({ page }) => {
+  test('reloads, routes and finds its workouts still there', async ({ page }) => {
     await openApp(page)
     await recordWorkout(page, 'Deadlift', { weight: 100, reps: 3 })
     await serviceWorkerReady(page)
