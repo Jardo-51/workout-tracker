@@ -10,8 +10,13 @@ import { dropIndex } from '@/utils/reorder'
  */
 const SCROLL_MARGIN_TOP = 72
 const SCROLL_MARGIN_BOTTOM = 160
-/** Per frame, so roughly 700 px a second. */
-const SCROLL_STEP = 12
+/**
+ * Pixels a second. Measured against the clock rather than counted per frame,
+ * because this is a phone-first app and phones ship 90 Hz and 120 Hz panels:
+ * a per-frame step tuned at 60 Hz runs at twice the speed on one of those and
+ * at half on a device that has throttled itself down to 30.
+ */
+const SCROLL_SPEED = 700
 
 /**
  * Drag-to-reorder for a list of sibling elements, without the HTML drag & drop
@@ -70,6 +75,8 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
    */
   let pointerId = -1
   let scrolling: number | undefined
+  /** Timestamp of the last autoscroll frame, to measure the next one against. */
+  let lastFrame = 0
 
   /**
    * Picks up the row the pointerdown's handle is on. Has to be called while
@@ -130,10 +137,14 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
     }
     pointerY = event.clientY
     update()
-    if (scrollSpeed() === 0) {
+    if (scrollDirection() === 0) {
       stopScrolling()
-    } else {
-      scrolling ??= requestAnimationFrame(scrollStep)
+    } else if (scrolling === undefined) {
+      // Seeded here rather than in the frame itself, so the first one covers
+      // the time since the finger reached the edge and not since whenever the
+      // page happened to load.
+      lastFrame = performance.now()
+      scrolling = requestAnimationFrame(scrollStep)
     }
   }
 
@@ -146,12 +157,13 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
     to.value = dropIndex(midpoints, from.value, midpoints[from.value]! + offset.value)
   }
 
-  function scrollSpeed (): number {
+  /** Which way the page should be scrolling under the finger, if at all. */
+  function scrollDirection (): number {
     if (pointerY < SCROLL_MARGIN_TOP) {
-      return -SCROLL_STEP
+      return -1
     }
     if (pointerY > window.innerHeight - SCROLL_MARGIN_BOTTOM) {
-      return SCROLL_STEP
+      return 1
     }
     return 0
   }
@@ -163,13 +175,14 @@ export function useDragReorder (onDrop: (id: string, to: number) => void) {
    * keeps the picked-up row under the finger rather than scrolling away with
    * the page.
    */
-  function scrollStep () {
+  function scrollStep (now: number) {
     scrolling = undefined
-    const speed = scrollSpeed()
-    if (speed === 0 || from.value === null) {
+    const direction = scrollDirection()
+    if (direction === 0 || from.value === null) {
       return
     }
-    window.scrollBy(0, speed)
+    window.scrollBy(0, direction * SCROLL_SPEED * (now - lastFrame) / 1000)
+    lastFrame = now
     update()
     scrolling = requestAnimationFrame(scrollStep)
   }
