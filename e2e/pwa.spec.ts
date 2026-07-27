@@ -53,7 +53,10 @@ test.describe('the app with the network down', () => {
     // client-side route, so this is workbox's navigate fallback handing back
     // the precached `index.html` and the router taking it from there. The
     // in-app navigation above cannot show this — it never made a document
-    // request — and it is what a user reopening an installed app does.
+    // request — and it is what a user reopening an installed app does. Home
+    // first so the assertion stands on its own: Settings being on screen after
+    // it can only be the cold start having rendered it.
+    await openHome(page)
     await page.goto('/settings')
     await expect(page.getByText('Backup', { exact: true })).toBeVisible()
   })
