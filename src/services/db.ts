@@ -75,13 +75,22 @@ export async function putSession (session: Session): Promise<void> {
  * backup import, or the tombstones left by a clear. One transaction, so a
  * failure part-way leaves the previous contents intact rather than a half
  * written mix of the two.
+ *
+ * Every request is issued before anything is awaited. Requests run in the
+ * order they were made, so the clear still precedes the puts, and there is no
+ * point at which the transaction has nothing pending — which is when one
+ * commits. `tx.done` is awaited alongside them rather than after: an abort
+ * rejects the writes still in flight and `tx.done` together, and whichever of
+ * those nothing is listening to becomes an unhandled rejection.
  */
 export async function replaceAllSessions (sessions: Session[]): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('sessions', 'readwrite')
-  await tx.store.clear()
-  await Promise.all(sessions.map(session => tx.store.put(toPlain(session))))
-  await tx.done
+  await Promise.all([
+    tx.store.clear(),
+    ...sessions.map(session => tx.store.put(toPlain(session))),
+    tx.done,
+  ])
 }
 
 export async function getSyncMeta (sessionId: string): Promise<SessionSyncMeta | undefined> {
