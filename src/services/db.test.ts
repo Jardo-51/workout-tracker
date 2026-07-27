@@ -155,6 +155,21 @@ describe('replaceAllSessions', () => {
     // path where the user can least recover from it.
     expect(await db.getAllSessions()).toEqual(before)
   })
+
+  it('leaves the store intact when serializing the argument throws', async () => {
+    const before = [makeSession('a'), makeSession('b')]
+    await seed(...before)
+    // `JSON.stringify` throws on a cycle, which is the one way an argument can
+    // make `toPlain` fail. Serialized inside the request batch it would fail
+    // with the clear already issued and nothing else pending to hold the
+    // transaction open, so the clear alone would commit.
+    const circular = makeSession('x') as Session & { self?: unknown }
+    circular.self = circular
+
+    await expect(db.replaceAllSessions([circular])).rejects.toThrow()
+
+    expect(await db.getAllSessions()).toEqual(before)
+  })
 })
 
 describe('meta and sync bookkeeping', () => {

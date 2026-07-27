@@ -85,10 +85,15 @@ export async function putSession (session: Session): Promise<void> {
  */
 export async function replaceAllSessions (sessions: Session[]): Promise<void> {
   const db = await getDB()
+  // Serialized before the transaction opens. `toPlain` can throw, and a throw
+  // from inside the batch would land after the clear had been issued, leaving
+  // the clear alone in the transaction with nothing pending to stop it
+  // committing — the store emptied by a call that rejected.
+  const plain = sessions.map(session => toPlain(session))
   const tx = db.transaction('sessions', 'readwrite')
   await Promise.all([
     tx.store.clear(),
-    ...sessions.map(session => tx.store.put(toPlain(session))),
+    ...plain.map(session => tx.store.put(session)),
     tx.done,
   ])
 }
