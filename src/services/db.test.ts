@@ -375,12 +375,20 @@ describe('meta and sync bookkeeping', () => {
 })
 
 describe('toPlain', () => {
-  it('stores a reactive session, which IndexedDB would refuse', async () => {
+  it('stores a reactive session, which a put of its own would refuse', async () => {
+    // The sessions store hands `db.ts` its own reactive objects, so this is the
+    // value the module is really given.
     const session = reactive(makeSession('a'))
+    // Let `db.ts` create the database, then take a second connection to it, so
+    // the same store can be written both ways.
+    await db.getAllSessions()
+    const raw = await rawOpen(2)
 
-    // What the round trip is for: the store hands its own reactive objects
-    // straight to these functions.
-    expect(() => structuredClone(session)).toThrow()
+    // The clone that matters is the one `IDBObjectStore.put` performs on the
+    // way in, not a standalone `structuredClone`: handed the proxy it fails
+    // with a DataCloneError, which is what the JSON round trip is for.
+    await expect(rawPut(raw, 'sessions', session)).rejects.toThrow()
+    raw.close()
 
     await db.putSession(session)
 
