@@ -462,6 +462,12 @@ export async function setSessionNote (page: Page, note: string) {
   // Saved on blur, so the focus has to go somewhere — the session's own header.
   await page.locator('.session-page .text-h6').first().click()
   await expect(noteButton(page)).toHaveText(note)
+  // The button is the store's copy, which the note reaches before the write to
+  // IndexedDB does: `updateSessionNote` assigns it and only then awaits
+  // `persist`. Reloading on the button alone races that write, and the reload
+  // wins often enough on a loaded CI runner to read the previous note back.
+  await expect.poll(async () => (await storedSessions(page)).map(session => session.note))
+    .toContain(note.trim() || undefined)
 }
 
 /** Starts a session from Home and lands on its page. */
