@@ -226,9 +226,50 @@ export function entryList (page: Page) {
   return page.locator('.session-page > .mb-2')
 }
 
-/** One break in the open session, named the way it reads: `1 min 30 s`. */
+/**
+ * One break in the open session, named the way it reads: `1 min 30 s`. Matched
+ * exactly, because its own reorder handle is a button whose name has this one
+ * inside it — *Reorder Break — 1 min 30 s* — and a loose match takes both.
+ */
 export function breakRow (page: Page, duration: string) {
-  return page.getByRole('button', { name: `Break — ${duration}` })
+  return page.getByRole('button', { name: `Break — ${duration}`, exact: true })
+}
+
+/**
+ * The reorder handle of one entry, exercise or break alike — named after what
+ * it moves, which for a break is the same `Break — 45 s` its row reads as.
+ * That is a different button from the row itself: the name here is prefixed.
+ * The suffix is the handle telling a screen reader which keys work on it, and
+ * is matched here so the exact name keeps one entry's handle from matching
+ * another whose name starts the same way.
+ */
+export function dragHandle (page: Page, entry: string) {
+  return page.getByRole('button', { name: `Reorder ${entry}, use arrow keys`, exact: true })
+}
+
+/**
+ * Drags one entry over another and drops it there, by its handle.
+ *
+ * Playwright's mouse is what drives it: Chromium raises the pointer events the
+ * app listens to from those, and there is no touch equivalent that does. It
+ * moves in steps because a single jump from one point to the other is one
+ * `pointermove`, which a drag would survive but which says nothing about
+ * whether it tracks the finger on the way.
+ *
+ * The drop lands on the *far* edge of the target's handle rather than its
+ * middle, because a row only takes another's place once it is more than half
+ * way over it — aiming at the middle is aiming at exactly the point where that
+ * has not quite happened.
+ */
+export async function dragEntry (page: Page, entry: string, onto: string) {
+  await settle(page)
+  const from = (await dragHandle(page, entry).boundingBox())!
+  const to = (await dragHandle(page, onto).boundingBox())!
+  const down = to.y > from.y
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + to.width / 2, down ? to.y + to.height : to.y, { steps: 10 })
+  await page.mouse.up()
 }
 
 /**
