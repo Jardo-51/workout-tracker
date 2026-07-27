@@ -12,6 +12,7 @@ import {
   openSession,
   recordWorkout,
   saveEntry,
+  serviceWorkerReady,
   sessionRow,
   snackbar,
   storedSessions,
@@ -140,6 +141,12 @@ syncedDescribe('sync between two devices', account => {
     await emptyTheAccount(deviceA)
     await logIn(deviceB, account)
 
+    // The worker has to have taken control before the network goes, because
+    // the reload below is served out of its precache: cutting the connection
+    // while the install is still running would fail there with
+    // `net::ERR_INTERNET_DISCONNECTED` — a race, not a regression. The logins
+    // above usually buy it enough time, and "usually" is what this removes.
+    await serviceWorkerReady(deviceA)
     await deviceA.context().setOffline(true)
     await recordWorkout(deviceA, 'Pull-up', { reps: 8 })
     const [recorded] = await visibleSessions(deviceA)
