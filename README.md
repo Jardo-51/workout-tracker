@@ -48,7 +48,7 @@ nix develop .#playwright -c pnpm test:e2e
 ```
 
 The backup tests that involve sync skip themselves unless an Etesync server is
-configured — [`e2e/README.md`](e2e/README.md) has the one-line docker command
+configured — [`e2e-tests/README.md`](e2e-tests/README.md) has the one-line docker command
 and the environment variables.
 
 ## Project Structure
@@ -69,7 +69,7 @@ src/
 ├── router/          # Route definitions
 └── main.ts          # App entry point
 
-e2e/                 # Playwright tests, driven against the production build
+e2e-tests/           # Playwright tests, driven against the production build
 ```
 
 ## Browser Support

@@ -1,7 +1,7 @@
 const CHANNEL_NAME = 'workout-tracker'
 
 /**
- * The Web Lock a sync run holds, exported because the e2e suite holds it
+ * The Web Lock a sync run holds, exported because the e2e-tests suite holds it
  * itself: catching a real second tab mid-run is not something a test can time,
  * and a name written out again over there would drift the day this one changes.
  */

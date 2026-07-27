@@ -9,7 +9,7 @@
   // sync still. None can come in as a project reference: tsconfig.app.json
   // disables emit, which a referenced project may not do.
   "include": [
-    "e2e/**/*",
+    "e2e-tests/**/*",
     "src/types/workout.ts",
     "src/services/db.constants.ts",
     "src/services/broadcast.ts"
@@ -17,7 +17,7 @@
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e-tests.tsbuildinfo",
 
     "module": "ESNext",
     "moduleResolution": "Bundler",

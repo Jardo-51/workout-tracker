@@ -36,8 +36,8 @@
     <template v-if="pastSessions.length > 0">
       <div class="text-subtitle-2 text-medium-emphasis mb-2">Previous sessions</div>
 
-      <!-- `past-sessions` is what the e2e helpers scope a session row to; the
-           app renders `v-list-item` in dialogs and menus as well. -->
+      <!-- `past-sessions` is what the e2e-tests helpers scope a session row
+           to; the app renders `v-list-item` in dialogs and menus as well. -->
       <v-card class="past-sessions">
         <v-list lines="two">
           <v-list-item
@@ -81,7 +81,7 @@
          IndexedDB after the first render, so without it a returning user is
          told they have no workouts for as long as that read takes. It also
          makes this the one thing on Home that says the store has loaded, which
-         is what `openTab` in the e2e helpers waits for. -->
+         is what `openTab` in the e2e-tests helpers waits for. -->
     <div
       v-else-if="!store.activeSession && store.loaded"
       class="text-center text-medium-emphasis mt-16"

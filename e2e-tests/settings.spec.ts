@@ -122,7 +122,7 @@ test.describe('settings', () => {
 
 /**
  * The account itself, which needs a real server: a rejected password and a
- * logout are both answers only the server can give. See e2e/README.md.
+ * logout are both answers only the server can give. See e2e-tests/README.md.
  */
 syncedDescribe('settings, with sync', account => {
   test.beforeEach(async ({ page }) => {

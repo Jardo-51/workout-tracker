@@ -20,8 +20,8 @@ import { syncedDescribe } from './support/etebase'
  *
  * This is where the feature's hard cases live: a clear here leaves tombstones
  * that reach the account, so a restore has to beat them — locally *and* on the
- * other device, which still holds the tombstone it pulled. See e2e/README.md
- * for the server these want.
+ * other device, which still holds the tombstone it pulled. See
+ * e2e-tests/README.md for the server these want.
  */
 syncedDescribe('backup, with sync', account => {
   test('a clear and an import both reach the account', async ({ browser }, testInfo) => {

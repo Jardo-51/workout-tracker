@@ -19,8 +19,8 @@ That shell exports `PLAYWRIGHT_BROWSERS_PATH` (at `playwright-driver.browsers`)
 and `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS`. Outside it, a run fails with
 *"Executable doesn't exist"*.
 
-CI runs them the same way (`.github/workflows/e2e.yml`), so the binary being
-driven there is the one being driven here.
+CI runs them the same way (`.github/workflows/e2e-tests.yml`), so the binary
+being driven there is the one being driven here.
 
 Useful variations:
 
@@ -96,8 +96,9 @@ docker run --rm -d --name etesync-test -p 8033:3735 \
 
 `ALLOWED_HOSTS` is required — the image's default wildcard makes starlette's
 `TrustedHostMiddleware` return 500 for every request. The tests sign the
-account up on first use (`e2e/support/etebase.ts`); this image only allows the
-seeded user to sign up, which is why the credentials above match `SUPER_USER`.
+account up on first use (`e2e-tests/support/etebase.ts`); this image only allows
+the seeded user to sign up, which is why the credentials above match
+`SUPER_USER`.
 
 Then point the tests at it:
 

@@ -55,7 +55,7 @@ export async function ensureAccount (account: Account): Promise<void> {
         `Could not sign up or log in as "${username}" at ${url}.\n`
         + `  signup: ${message(signupError)}\n`
         + `  login:  ${message(loginError)}\n`
-        + 'See e2e/README.md for how to start a server.',
+        + 'See e2e-tests/README.md for how to start a server.',
         { cause: loginError },
       )
     }
@@ -80,7 +80,7 @@ function message (error: unknown): string {
 export function syncedDescribe (title: string, body: (account: Account) => void) {
   const account = accountFromEnv() as Account
   test.describe(title, () => {
-    test.skip(!account, 'set E2E_ETEBASE_URL to run the sync tests — see e2e/README.md')
+    test.skip(!account, 'set E2E_ETEBASE_URL to run the sync tests — see e2e-tests/README.md')
     test.describe.configure({ mode: 'serial' })
 
     test.beforeAll(async () => {

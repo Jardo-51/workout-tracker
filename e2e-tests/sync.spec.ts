@@ -35,7 +35,7 @@ import { syncedDescribe } from './support/etebase'
  *
  * `sync-backup.spec.ts` is the other half: the same two devices, but about
  * what export, clear and import do to an account. Neither file needs a backup
- * file to be involved here. See e2e/README.md for the server these want.
+ * file to be involved here. See e2e-tests/README.md for the server these want.
  */
 syncedDescribe('sync between two devices', account => {
   test('carries a workout to the other device, and its deletion after it', async ({ browser }) => {

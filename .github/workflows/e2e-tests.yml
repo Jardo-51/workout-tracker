@@ -1,4 +1,4 @@
-name: E2E
+name: E2E Tests
 
 # Separate from Build on purpose: Build gates every push and stays fast, while
 # this one makes a production build and drives it in a browser. Pull requests
@@ -10,11 +10,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: e2e-${{ github.ref }}
+  group: e2e-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  e2e:
+  e2e-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
 

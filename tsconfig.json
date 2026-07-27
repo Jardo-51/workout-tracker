@@ -8,7 +8,7 @@
       "path": "./tsconfig.app.json"
     },
     {
-      "path": "./tsconfig.e2e.json"
+      "path": "./tsconfig.e2e-tests.json"
     }
   ]
 }

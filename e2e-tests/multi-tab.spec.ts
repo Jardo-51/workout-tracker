@@ -90,8 +90,8 @@ test.describe('two tabs of one device', () => {
 /**
  * The sync lock, which is the one thing here that a fake server cannot show:
  * what it prevents is two runs racing the same stoken and item caches, and
- * those only mean anything against a real one. See e2e/README.md for the server
- * this wants.
+ * those only mean anything against a real one. See e2e-tests/README.md for the
+ * server this wants.
  */
 syncedDescribe('two tabs of one device on one account', account => {
   test('stops the second tab syncing while the first one is', async ({ browser }) => {

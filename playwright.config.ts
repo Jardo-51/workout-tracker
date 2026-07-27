@@ -20,10 +20,10 @@ const BASE_URL = `http://127.0.0.1:${PORT}`
  *
  *     nix eval --raw 'github:NixOS/nixpkgs/nixos-26.05#playwright-driver.version'
  *
- * See e2e/README.md for the Etesync server the sync tests want.
+ * See e2e-tests/README.md for the Etesync server the sync tests want.
  */
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './e2e-tests',
   // A run drives IndexedDB, a service worker and (for the sync tests) a real
   // server per browser context; one worker keeps that off each other's toes
   // and keeps failures reproducible. There are only a handful of tests.
