@@ -60,6 +60,7 @@ src/
 │   ├── layout/      # Bottom navigation
 │   ├── session/     # Workout/break entry editors, history, steppers
 │   └── settings/    # Theme toggle, weight unit, Etesync sync, JSON backup
+├── composables/     # Reusable Composition API logic (drag-to-reorder)
 ├── services/        # IndexedDB, Etesync sync engine, cross-tab broadcast, backup format
 ├── stores/          # Pinia stores (app, sessions, sync)
 ├── utils/           # Formatting and error helpers

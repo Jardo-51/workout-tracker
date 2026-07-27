@@ -57,18 +57,24 @@
       </div>
     </div>
 
-    <template v-for="entry in session.entries" :key="entry.id">
+    <template v-for="(entry, index) in session.entries" :key="entry.id">
       <WorkoutEntryCard
         v-if="entry.kind === 'workout'"
+        v-bind="drag.itemAttrs(index)"
         :entry="entry"
         @edit="openWorkoutEdit(entry)"
+        @grab="drag.start"
         @history="openHistory(entry.name)"
+        @move="nudgeEntry(index, $event)"
       />
 
       <BreakEntryRow
         v-else
+        v-bind="drag.itemAttrs(index)"
         :entry="entry"
         @edit="openBreakEdit(entry)"
+        @grab="drag.start"
+        @move="nudgeEntry(index, $event)"
       />
     </template>
 
@@ -134,6 +140,7 @@
   import ExerciseHistoryDialog from '@/components/session/ExerciseHistoryDialog.vue'
   import WorkoutEntryCard from '@/components/session/WorkoutEntryCard.vue'
   import WorkoutEntryDialog from '@/components/session/WorkoutEntryDialog.vue'
+  import { useDragReorder } from '@/composables/useDragReorder'
   import { useAppStore } from '@/stores/app'
   import { useSessionsStore } from '@/stores/sessions'
   import { formatDateKey, formatTime } from '@/utils/format'
@@ -203,6 +210,21 @@
       : store.updateEntry(session.value.id, entry))
   }
 
+  const drag = useDragReorder((from, to) => void moveEntry(from, to))
+
+  /** The keyboard way through the drag handle: one place up or down. */
+  function nudgeEntry (index: number, delta: number) {
+    void moveEntry(index, index + delta)
+  }
+
+  async function moveEntry (from: number, to: number) {
+    const entry = session.value?.entries[from]
+    if (!session.value || !entry) {
+      return
+    }
+    await store.moveEntry(session.value.id, entry.id, to)
+  }
+
   async function removeEntry (entryId: string) {
     if (!session.value) {
       return
@@ -238,6 +260,22 @@
   /* Keep the last entries reachable above the fixed action bar, plus the iOS
      home-indicator inset the bar itself clears. */
   padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+}
+
+/* The row in the air: over the ones it is being dragged past, and without the
+   transition below, since it is following a finger rather than animating.
+   Opaque, so what it is passing over reads as underneath it rather than
+   through it — a break row is only a line of text and shows straight
+   through anything translucent. */
+.drag-item--lifted {
+  position: relative;
+  z-index: 2;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 30%);
+}
+
+.drag-item--sliding {
+  transition: transform 150ms ease;
 }
 
 .action-bar {

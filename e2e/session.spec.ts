@@ -6,6 +6,8 @@ import {
   breakRow,
   breakSheet,
   confirmCard,
+  dragEntry,
+  dragHandle,
   entryCard,
   entryList,
   fillWorkoutValues,
@@ -176,6 +178,50 @@ test.describe('a workout session', () => {
     // The order is the stored one, not an artefact of how the page was built.
     await page.reload()
     await expect(entryList(page)).toHaveText(inOrder)
+  })
+
+  test('drags an entry into a different place, and keeps it there', async ({ page }) => {
+    await startSession(page)
+    await addExercise(page, 'Squat')
+    await addBreakPreset(page, 60)
+    await addExercise(page, 'Bench press')
+
+    // Up over both of them: an exercise and a break reorder alike, and the
+    // card being several times taller than the break row is exactly the case
+    // that midpoints rather than edges decide.
+    await dragEntry(page, 'Bench press', 'Squat')
+    const reordered = [/^Bench press/, /^Squat/, /^Break — 1 min$/]
+    await expect(entryList(page)).toHaveText(reordered)
+
+    // And back down again, the other direction through the same code.
+    await dragEntry(page, 'Bench press', 'Squat')
+    await expect(entryList(page)).toHaveText([/^Squat/, /^Bench press/, /^Break — 1 min$/])
+
+    await dragEntry(page, 'Break — 1 min', 'Squat')
+    const settled = [/^Break — 1 min$/, /^Squat/, /^Bench press/]
+    await expect(entryList(page)).toHaveText(settled)
+
+    // The new order is what was stored, not what the page happens to show.
+    await page.reload()
+    await expect(entryList(page)).toHaveText(settled)
+  })
+
+  test('moves an entry from the handle with the keyboard, and stops at the ends', async ({ page }) => {
+    await startSession(page)
+    await addExercise(page, 'Squat')
+    await addBreakPreset(page, 60)
+    await addExercise(page, 'Bench press')
+
+    await dragHandle(page, 'Bench press').press('ArrowUp')
+    await expect(entryList(page)).toHaveText([/^Squat/, /^Bench press/, /^Break — 1 min$/])
+
+    // Focus follows the entry it is on, so the next press moves the same one.
+    await page.keyboard.press('ArrowUp')
+    await expect(entryList(page)).toHaveText([/^Bench press/, /^Squat/, /^Break — 1 min$/])
+
+    // Off the top of the list is not a place an entry can go.
+    await page.keyboard.press('ArrowUp')
+    await expect(entryList(page)).toHaveText([/^Bench press/, /^Squat/, /^Break — 1 min$/])
   })
 
   test('shows what was lifted last time, and says so when there was no last time', async ({ page }) => {

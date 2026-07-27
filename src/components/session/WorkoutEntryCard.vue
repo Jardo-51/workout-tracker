@@ -10,6 +10,14 @@
         <template v-if="entry.tempo">· tempo {{ formatTempo(entry.tempo) }}</template>
       </v-card-subtitle>
 
+      <template #prepend>
+        <DragHandle
+          :label="entry.name"
+          @grab="emit('grab', $event)"
+          @move="emit('move', $event)"
+        />
+      </template>
+
       <template #append>
         <v-btn
           icon="$history"
@@ -23,6 +31,7 @@
 
 <script lang="ts" setup>
   import type { WorkoutEntry } from '@/types/workout'
+  import DragHandle from '@/components/session/DragHandle.vue'
   import { formatTempo } from '@/utils/format'
 
   defineProps<{
@@ -31,6 +40,8 @@
 
   const emit = defineEmits<{
     edit: []
+    grab: [event: PointerEvent]
     history: []
+    move: [delta: number]
   }>()
 </script>

@@ -12,6 +12,7 @@ import {
 } from '@/services/db'
 import { errorMessage } from '@/utils/error'
 import { toDateKey } from '@/utils/format'
+import { moveItem } from '@/utils/reorder'
 import { compareSessions } from '@/utils/sessionOrder'
 
 function normalizeName (name: string): string {
@@ -430,6 +431,28 @@ export const useSessionsStore = defineStore('sessions', () => {
     await persist(session)
   }
 
+  /**
+   * Moves one entry to `toIndex`, counted in the list it has been taken out of.
+   *
+   * Named by id rather than by where it currently is, because the drag it comes
+   * from spans seconds — long enough for a sync or another tab to have replaced
+   * the entries underneath it. An index would then move whatever had landed in
+   * that slot; an id either moves the row the user picked up or, if it is gone,
+   * nothing at all.
+   */
+  async function moveEntry (sessionId: string, entryId: string, toIndex: number) {
+    const session = getSession(sessionId)
+    if (!session) {
+      return
+    }
+    const from = session.entries.findIndex(e => e.id === entryId)
+    if (from === -1 || toIndex === from || toIndex < 0 || toIndex >= session.entries.length) {
+      return
+    }
+    session.entries = moveItem(session.entries, from, toIndex)
+    await persist(session)
+  }
+
   async function removeEntry (sessionId: string, entryId: string) {
     const session = getSession(sessionId)
     if (!session) {
@@ -462,6 +485,7 @@ export const useSessionsStore = defineStore('sessions', () => {
     restoreSession,
     addEntry,
     updateEntry,
+    moveEntry,
     removeEntry,
   }
 })

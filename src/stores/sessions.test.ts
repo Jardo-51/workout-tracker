@@ -122,6 +122,79 @@ describe('clearAllSessions', () => {
   })
 })
 
+describe('moveEntry', () => {
+  function sessionWithEntries (): Session {
+    return {
+      ...makeSession('a'),
+      entries: [
+        { id: 'one', kind: 'break', durationSec: 60 },
+        { id: 'two', kind: 'break', durationSec: 90 },
+        { id: 'three', kind: 'break', durationSec: 120 },
+      ],
+    }
+  }
+
+  const entryIds = (store: ReturnType<typeof useSessionsStore>) =>
+    store.sessions[0]!.entries.map(e => e.id)
+
+  it('moves an entry down the list and persists the new order', async () => {
+    const store = storeWith(sessionWithEntries())
+
+    await store.moveEntry('a', 'one', 2)
+
+    expect(entryIds(store)).toEqual(['two', 'three', 'one'])
+    expect(db.putSession).toHaveBeenCalledWith(store.sessions[0])
+  })
+
+  it('moves an entry up the list', async () => {
+    const store = storeWith(sessionWithEntries())
+
+    await store.moveEntry('a', 'three', 0)
+
+    expect(entryIds(store)).toEqual(['three', 'one', 'two'])
+  })
+
+  it('bumps the stamp, so the move syncs like any other edit', async () => {
+    const store = storeWith(sessionWithEntries())
+
+    await store.moveEntry('a', 'one', 1)
+
+    expect(store.sessions[0]!.updatedAt).toBe(FUTURE + 1)
+    expect(store.mutationCount).toBe(1)
+  })
+
+  it('writes nothing when the entry would not move', async () => {
+    const store = storeWith(sessionWithEntries())
+
+    await store.moveEntry('a', 'two', 1)
+
+    expect(db.putSession).not.toHaveBeenCalled()
+    expect(store.sessions[0]!.updatedAt).toBe(FUTURE)
+  })
+
+  it('ignores a target past either end of the list', async () => {
+    // Where the keyboard lands when the first entry is asked to go up again.
+    const store = storeWith(sessionWithEntries())
+
+    await store.moveEntry('a', 'one', -1)
+    await store.moveEntry('a', 'three', 3)
+
+    expect(entryIds(store)).toEqual(['one', 'two', 'three'])
+    expect(db.putSession).not.toHaveBeenCalled()
+  })
+
+  it('moves nothing when the entry is gone', async () => {
+    // A sync or another tab can replace the entries mid-drag; the id says the
+    // row that was picked up is no longer there, so nothing takes its place.
+    const store = storeWith(sessionWithEntries())
+
+    await store.moveEntry('a', 'deleted-while-dragging', 0)
+
+    expect(entryIds(store)).toEqual(['one', 'two', 'three'])
+    expect(db.putSession).not.toHaveBeenCalled()
+  })
+})
+
 describe('importSessions', () => {
   const withStamp = (id: string, updatedAt: number): Session => ({ ...makeSession(id), updatedAt })
 
