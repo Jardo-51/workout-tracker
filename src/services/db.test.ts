@@ -42,6 +42,40 @@ async function seed (...sessions: Session[]): Promise<void> {
   }
 }
 
+const DB_NAME = 'workout-tracker'
+
+/**
+ * Opens the database the way `db.ts` is not allowed to — at a chosen version,
+ * with a chosen upgrade — so a test can set up the state `db.ts` then has to
+ * cope with: an install still on version 1, or a version newer than the one it
+ * asks for.
+ */
+function rawOpen (version: number, upgrade?: (database: IDBDatabase) => void): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.open(DB_NAME, version)
+    request.addEventListener('upgradeneeded', () => upgrade?.(request.result))
+    request.addEventListener('success', () => resolve(request.result))
+    request.addEventListener('error', () => reject(request.error ?? new Error('open failed')))
+  })
+}
+
+function rawPut (database: IDBDatabase, store: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(store, 'readwrite')
+    tx.objectStore(store).put(value)
+    tx.addEventListener('complete', () => resolve())
+    tx.addEventListener('error', () => reject(tx.error ?? new Error('put failed')))
+  })
+}
+
+function rawDelete (): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.deleteDatabase(DB_NAME)
+    request.addEventListener('success', () => resolve())
+    request.addEventListener('error', () => reject(request.error ?? new Error('delete failed')))
+  })
+}
+
 /**
  * Aborts the transaction once its `n`th request has succeeded — the clear is
  * the first, then one put per session. Anchoring on the success event rather
@@ -125,6 +159,48 @@ async function withUnhandledRejections (run: () => Promise<void>): Promise<unkno
   }
   return caught
 }
+
+describe('opening the database', () => {
+  it('retries the open after a failure rather than replaying it', async () => {
+    // A database already at version 3 makes `db.ts`'s open a downgrade, which
+    // IndexedDB refuses — the same shape of failure as a blocked upgrade in
+    // another tab or a storage quota, and one this environment can produce.
+    const newer = await rawOpen(3)
+    newer.close()
+
+    await expect(db.getAllSessions()).rejects.toThrow()
+
+    // Remove the cause, then ask again. `getDB` drops the memoised promise on
+    // rejection precisely so this second call opens rather than handing back
+    // the first failure; memoising it would strand the page until a reload.
+    await rawDelete()
+
+    expect(await db.getAllSessions()).toEqual([])
+  })
+
+  it('keeps a version 1 install through the version 2 upgrade', async () => {
+    const legacy = makeSession('a')
+    const v1 = await rawOpen(1, database => {
+      // What `oldVersion < 1` creates. Everything else in this file starts from
+      // an empty factory and so runs that branch; this test is the only one
+      // that arrives at `upgrade` with data already in the store.
+      const store = database.createObjectStore('sessions', { keyPath: 'id' })
+      store.createIndex('by-dateKey', 'dateKey')
+    })
+    await rawPut(v1, 'sessions', legacy)
+    v1.close()
+
+    // The first call opens at version 2, so `oldVersion` is 1 and only the
+    // second branch runs. The workouts of an install that predates sync have
+    // to survive it.
+    expect(await db.getAllSessions()).toEqual([legacy])
+
+    // And the stores that branch adds are there and usable.
+    await db.setMeta('theme', 'dark')
+    expect(await db.getMeta('theme')).toBe('dark')
+    expect(await db.getSyncMeta('a')).toBeUndefined()
+  })
+})
 
 describe('sessions round trip', () => {
   it('reads back what was written, tombstones included', async () => {
