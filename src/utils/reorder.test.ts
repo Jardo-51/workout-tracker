@@ -23,6 +23,14 @@ describe('moveItem', () => {
     moveItem(list, 0, 2)
     expect(list).toEqual(original)
   })
+
+  it('refuses to move a row that is not there', () => {
+    // Splicing out of range takes nothing out, and putting that back would
+    // leave an `undefined` in the list for the caller to store.
+    expect(moveItem(list, 4, 0)).toEqual(list)
+    expect(moveItem(list, -1, 0)).toEqual(list)
+    expect(moveItem([], 0, 0)).toEqual([])
+  })
 })
 
 describe('dropIndex', () => {

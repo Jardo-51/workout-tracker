@@ -5,11 +5,26 @@
  * has, which is what a drop is: the dragged row is out of the flow as far as
  * the user is concerned, and the gap it is dropped into is the one between the
  * rows that are left.
+ *
+ * A `from` that is not an index into `items` returns the list unchanged. The
+ * one caveat is a list that holds `undefined` as a real value: moving one of
+ * those is indistinguishable from moving nothing, and is refused. No list in
+ * this app has one.
  */
 export function moveItem<T> (items: T[], from: number, to: number): T[] {
+  // Read before the splice rather than out of what it returns, because
+  // `splice` is forgiving in two different and equally unhelpful ways: past
+  // the end it takes nothing out, and putting that nothing back would leave an
+  // `undefined` in the list for the caller to store as a session entry, while
+  // a negative `from` counts from the end and would quietly move the wrong row
+  // altogether. A plain index lookup says `undefined` to both.
+  const item = items[from]
+  if (item === undefined) {
+    return items
+  }
   const result = [...items]
-  const [item] = result.splice(from, 1)
-  result.splice(to, 0, item!)
+  result.splice(from, 1)
+  result.splice(to, 0, item)
   return result
 }
 
